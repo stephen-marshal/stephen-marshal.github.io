@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stephen Marshall — DevOps, SRE & Platform Engineering Artisan</title>
+<meta name="description" content="Stephen Marshall — DevOps, SRE & Platform Engineering Artisan.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Stephen Marshall</h1>
+    <p class="role">DevOps, SRE &amp; Platform Engineering Artisan</p>
+    <blockquote class="quote">“Continuous learning is the minimum requirement for success in any field.”</blockquote>
+    <div class="contact">
+      <a href="https://www.linkedin.com/in/stephenmarshallsheerness" rel="noopener">linkedin.com/in/stephenmarshallsheerness</a>
+    </div>
+    <div class="session" id="session" hidden>
+      Signed in as <span id="who"></span> · <button class="linkbtn" id="signout">Sign out</button>
+    </div>
+    <div class="actions" id="actions" hidden>
+      <button class="btn" onclick="window.print()">Download / print PDF</button>
+    </div>
+  </header>
+
+  <div class="loading" id="loading">Loading…</div>
+
+  <div class="gate" id="gate" hidden>
+    <p>Sign in to view my full CV.</p>
+    <div class="providers">
+      <button class="provider" data-provider="google">
+        <svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.6l6.7-6.7C35.6 2.4 30.2 0 24 0 14.6 0 6.6 5.4 2.6 13.2l7.8 6.1C12.3 13.600 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 6.9l7.4 5.8c4.3-4 6.9-9.9 6.9-17.2z"/><path fill="#FBBC05" d="M10.4 28.7c-.5-1.4-.8-3-.8-4.7s.3-3.2.8-4.7l-7.8-6.1C1 16.5 0 20.1 0 24s1 7.500 2.6 10.8l7.8-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.4-5.8c-2.1 1.4-4.8 2.3-8.5 2.3-6.3 0-11.7-4.1-13.6-9.8l-7.8 6.1C6.6 42.6 14.6 48 24 48z"/></svg>
+        Continue with Google
+      </button>
+      <button class="provider" data-provider="microsoft" hidden>
+        <svg viewBox="0 0 23 23" aria-hidden="true"><path fill="#f35325" d="M1 1h10v10H1z"/><path fill="#81bc06" d="M12 1h10v10H12z"/><path fill="#05a6f0" d="M1 12h10v10H1z"/><path fill="#ffba08" d="M12 12h10v10H12z"/></svg>
+        Continue with Microsoft
+      </button>
+      <button class="provider" data-provider="github" hidden>
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.530-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        Continue with GitHub
+      </button>
+    </div>
+    <div class="error" id="error" hidden></div>
+    <div class="note">
+      When you sign in, I record your name, email address and when you visited.
+      <details>
+        <summary>Privacy note</summary>
+        <p>I use this only to know who has viewed my CV so I can follow up professionally. It is never shared or sold, and only I can see it. Records are kept for up to 12 months. To have your details deleted, email <a href="mailto:stephen.marshall.sheerness@gmail.com">stephen.marshall.sheerness@gmail.com</a>. Sign-in is handled by Google Firebase.</p>
+      </details>
+    </div>
+  </div>
+
+  <div id="cv" hidden></div>
+
+</div>
+<script type="module" src="app.js"></script>
+</body>
+</html>

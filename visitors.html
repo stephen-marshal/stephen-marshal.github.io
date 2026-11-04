@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>CV Visitors</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>CV Visitors</h1>
+    <div class="session" id="session" hidden>
+      Signed in as <span id="who"></span> · <button class="linkbtn" id="signout">Sign out</button> · <a href="./">View CV</a>
+    </div>
+  </header>
+
+  <div class="loading" id="status">Loading…</div>
+
+  <div class="gate" id="gate" hidden>
+    <div class="providers">
+      <button class="provider" id="signin">Sign in with Google</button>
+    </div>
+  </div>
+
+  <div id="owner" hidden>
+    <section>
+      <h2 id="count">Visitors</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Name</th><th>Email</th><th>Via</th><th>First visit</th><th>Last visit</th><th>Visits</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </section>
+    <section>
+      <h2>Publish CV content</h2>
+      <p>Choose your local <code>cv-content.html</code> to replace the CV that signed-in visitors see.</p>
+      <input type="file" id="file" accept=".html,text/html">
+      <span id="published" class="session"></span>
+    </section>
+  </div>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
+  import { getAuth, onAuthStateChanged, signInWithPopup, signOut, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
+  import { getFirestore, collection, getDocs, orderBy, query, doc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
+  import { firebaseConfig, OWNER_EMAIL } from "./firebase-config.js";
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+  const $ = (id) => document.getElementById(id);
+  const fmt = (t) => t ? t.toDate().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" }) : "";
+  const via = (p) => ({ "google.com": "Google", "github.com": "GitHub", "microsoft.com": "Microsoft" }[p] || p);
+
+  $("signin").onclick = () => signInWithPopup(auth, new GoogleAuthProvider());
+  $("signout").onclick = () => signOut(auth);
+
+  onAuthStateChanged(auth, async (user) => {
+    $("owner").hidden = true;
+    $("gate").hidden = !!user;
+    $("session").hidden = !user;
+    if (!user) { $("status").textContent = "Owner sign-in required."; return; }
+    $("who").textContent = user.email;
+    if (user.email !== OWNER_EMAIL) { $("status").textContent = "This page is private."; return; }
+
+    const snap = await getDocs(query(collection(db, "visitors"), orderBy("lastSeen", "desc")));
+    $("rows").replaceChildren(...snap.docs.map((d) => {
+      const v = d.data();
+      const tr = document.createElement("tr");
+      for (const cell of [v.name, v.email, via(v.provider), fmt(v.firstSeen), fmt(v.lastSeen), v.visits]) {
+        const td = document.createElement("td");
+        td.textContent = cell ?? "";
+        tr.append(td);
+      }
+      return tr;
+    }));
+    $("count").textContent = `Visitors (${snap.size})`;
+    $("status").hidden = true;
+    $("owner").hidden = false;
+  });
+
+  $("file").onchange = async (e) => {
+    const f = e.target.files[0];
+    if (!f) return;
+    $("published").textContent = "Publishing…";
+    try {
+      await setDoc(doc(db, "cv", "content"), { html: await f.text(), updated: serverTimestamp() });
+      $("published").textContent = `Published ${f.name} at ${new Date().toLocaleTimeString("en-GB")}.`;
+    } catch (err) {
+      $("published").textContent = "Publish failed: " + err.message;
+    }
+    e.target.value = "";
+  };
+</script>
+</body>
+</html>
