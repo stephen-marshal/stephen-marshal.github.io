@@ -26,7 +26,6 @@ Visitor ──► stephen-marshal.github.io  (GitHub Pages: public login screen 
 - **The CV text is not in this repo.** It lives in Firestore and is only sent to signed-in users.
   The master copy is kept locally in `~/dev/repos/personal/cv-private/cv-content.html`. That folder is not in git, so back it up.
 - **The Firebase config in `firebase-config.js` is public by design.** Access is enforced by the Firestore security rules, not by keeping the config secret.
-- **Owner:** `stephen.marshall.sheerness@gmail.com` is the only account that can open `/visitors.html` and publish CV updates.
 
 ### Files
 
@@ -125,9 +124,3 @@ A CV site uses a tiny fraction of this. If Firebase ever suggests upgrading to *
 
 The sign-in screen tells visitors what is recorded (name, email, visit times), why, how long it is kept (up to 12 months), and how to ask for deletion.
 Keep that note accurate if anything changes, because it is what UK GDPR requires.
-
-## Gotchas
-- **Two GitHub accounts on this Mac.** This repo belongs to `stephen-marshal` (personal); work uses `stephen-marshall-sheerness`.
-  Run `gh auth switch -u stephen-marshal` before pushing here.
-- **Same email, different sign-in methods.** If someone signs in with GitHub using an email they already used with Google, Firebase rejects it, and the page asks them to use their original method.
-- **Search engines and archive sites** may still hold a copy of the original fully public CV, which was live for a few hours on 4 Nov 2026.
