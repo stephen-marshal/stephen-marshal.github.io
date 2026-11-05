@@ -65,9 +65,36 @@ async function recordVisit(user) {
   });
 }
 
+// Build the sticky section nav from the CV's <h2> headings, and highlight the one in view.
+let spy;
+function buildNav() {
+  const nav = $("cvnav");
+  nav.innerHTML = "";
+  spy?.disconnect();
+  const sections = [...$("cv").querySelectorAll("section")].filter((s) => s.querySelector("h2"));
+  sections.forEach((s) => {
+    const label = s.querySelector("h2").textContent.trim();
+    s.id = s.id || label.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    const a = document.createElement("a");
+    a.href = `#${s.id}`;
+    a.textContent = label;
+    nav.appendChild(a);
+  });
+  nav.hidden = sections.length === 0;
+  spy = new IntersectionObserver((entries) => {
+    entries.forEach((e) => {
+      if (!e.isIntersecting) return;
+      nav.querySelectorAll("a").forEach((a) => a.classList.toggle("active", a.hash === `#${e.target.id}`));
+    });
+  }, { rootMargin: "-30% 0px -60% 0px" });
+  sections.forEach((s) => spy.observe(s));
+}
+
 onAuthStateChanged(auth, async (user) => {
   $("loading").hidden = true;
+  document.body.classList.toggle("signed-in", !!user);
   if (!user) {
+    $("cvnav").hidden = true;
     $("gate").hidden = false;
     $("cv").hidden = true;
     $("session").hidden = true;
@@ -92,6 +119,7 @@ onAuthStateChanged(auth, async (user) => {
     $("cv").innerHTML = snap.exists() ? snap.data().html : '<p class="loading">CV coming soon.</p>';
     $("cv").hidden = false;
     $("actions").hidden = false;
+    buildNav();
   } catch (e) {
     $("cv").innerHTML = '<p class="loading">Could not load the CV. Please refresh.</p>';
     $("cv").hidden = false;
