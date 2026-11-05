@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OpenTofu 1.13 in Practice — Stephen Marshall</title>
+<meta name="description" content="OpenTofu 1.12 and 1.13 from the infrastructure engineer's chair: dynamic prevent_destroy, forgetting resources safely, taming unknown values at plan time, and the upgrade notes that will bite.">
+<meta property="og:title" content="OpenTofu 1.13: the quiet release that fixes my loudest plans">
+<meta property="og:type" content="article">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../style.css">
+<link rel="stylesheet" href="../blog.css">
+</head>
+<body>
+<div class="wrap">
+<nav class="topnav"><a href="../../">Stephen Marshall</a><a href="../">← All posts</a></nav>
+
+<article>
+<div class="meta">5 November 2026 · OpenTofu · 7 min read</div>
+<h1>OpenTofu 1.13: the quiet release that fixes my loudest plans</h1>
+<p class="lede">The release notes call it "relatively light". For anyone who has stared at a wall of <code>(known after apply)</code>, it's a good one.</p>
+
+<p>OpenTofu 1.13.0 came out at the end of September 2026. The latest patch at the time of writing is 1.13.8, published yesterday, and it fixes a regression in the <code>-v</code> flag. The maintainers were upfront that the cycle was short and the feature list is modest. I almost skipped it.</p>
+
+<p>But my working week is mostly Terragrunt stacks, plans that run through a CI pipeline, and reviewing other people's diffs. For that kind of work, the small changes in 1.12 and 1.13 make a real difference. This post covers the ones I'm actually adopting, plus the upgrade notes that will catch someone out.</p>
+
+<h2>Plans you can actually read</h2>
+
+<p>Every infrastructure engineer knows the feeling. You change one tag, and the plan shows forty lines of <code>(known after apply)</code> spreading through every module that touches the value. Reviewers can't tell a harmless change from a dangerous one, so they approve anyway. That's where incidents come from.</p>
+
+<p>1.13 adds two tools for this. The first is <strong><code>convert</code></strong>. It takes a value whose shape OpenTofu can't infer, such as the output of <code>jsondecode()</code> on something only known after apply, and gives it an explicit type. The plan can then reason about the structure even while the contents are unknown:</p>
+
+<pre><code>output "example" {
+  value = convert(
+    jsondecode(something_dynamic.example.output_json),
+    object({ id = string, tags = map(string) })
+  )
+}</code></pre>
+
+<p>The second is the <strong><code>assume…</code> family</strong>. With these functions you tell the planner something you know about a value it hasn't seen yet, for example "this will never be null" or "this VPC ID will start with <code>vpc-</code>":</p>
+
+<pre><code>output "vpc_id" {
+  value = assumenotnull(assumestringprefix(aws_vpc.example.id, "vpc-"))
+}</code></pre>
+
+<figure>
+<div class="diagram">
+<svg viewBox="0 0 760 270" role="img" aria-labelledby="t1 d1">
+  <title id="t1">How convert and assume functions narrow unknown values at plan time</title>
+  <desc id="d1">Top row: a value known only after apply flows into downstream modules as fully unknown, so every dependent resource shows known after apply. Bottom row: the same value passes through convert or an assume function, so the plan knows its type, that it is not null, or its prefix. Downstream modules can plan precisely, and at apply time OpenTofu checks the promise and fails the apply if it was wrong.</desc>
+  <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker></defs>
+  <text x="16" y="24" font-size="12" font-weight="600" class="muted">BEFORE</text>
+  <rect class="box" x="16" y="36" width="190" height="62" rx="10"/>
+  <text x="30" y="62" font-size="13" class="mono">aws_vpc.example.id</text>
+  <text x="30" y="82" font-size="12" class="muted">(known after apply)</text>
+  <path class="arrow" d="M206 67 H 270" marker-end="url(#ah)"/>
+  <rect class="box-warn" x="276" y="36" width="468" height="62" rx="10"/>
+  <text x="292" y="62" font-size="13">downstream modules: everything unknown</text>
+  <text x="292" y="82" font-size="12" class="muted">types, nullness, counts → noisy plan, hard to review</text>
+
+  <text x="16" y="138" font-size="12" font-weight="600" class="muted">WITH 1.13</text>
+  <rect class="box" x="16" y="150" width="190" height="62" rx="10"/>
+  <text x="30" y="176" font-size="13" class="mono">aws_vpc.example.id</text>
+  <text x="30" y="196" font-size="12" class="muted">(known after apply)</text>
+  <path class="arrow" d="M206 181 H 246" marker-end="url(#ah)"/>
+  <rect class="box-accent" x="252" y="150" width="210" height="62" rx="10"/>
+  <text x="266" y="176" font-size="13" class="mono">assumenotnull(…)</text>
+  <text x="266" y="196" font-size="13" class="mono">assumestringprefix(…)</text>
+  <path class="arrow" d="M462 181 H 502" marker-end="url(#ah)"/>
+  <rect class="box" x="508" y="150" width="236" height="62" rx="10"/>
+  <text x="522" y="176" font-size="13">plan knows: string, not null,</text>
+  <text x="522" y="196" font-size="13">starts with <tspan class="mono">"vpc-"</tspan></text>
+  <path class="arrow" d="M357 212 V 236" marker-end="url(#ah)"/>
+  <text x="357" y="256" text-anchor="middle" font-size="12" class="muted">at apply: promise checked; if it's wrong, the apply fails</text>
+</svg>
+</div>
+<figcaption>The assume functions are a promise to the planner. You get a clearer plan, and OpenTofu still checks the promise at apply time.</figcaption>
+</figure>
+
+<p>There's a catch, and the maintainers say it plainly: if your assumption turns out to be wrong, the apply fails. I see that as a feature. It's like a type annotation for infrastructure. It documents what you expect and fails loudly when you're wrong, instead of quietly creating the wrong thing.</p>
+
+<h2>Guard rails that change per environment</h2>
+
+<p>This one is from 1.12 (May 2026), but it's the change I've been waiting longest for. <code>prevent_destroy</code> can now refer to input variables in the same module. It used to be a hard-coded literal, which left you two bad options. You could protect the database everywhere and fight the guard every time you tore down a sandbox. Or you could protect it nowhere and hope.</p>
+
+<pre><code>variable "prevent_destroy_database" {
+  type    = bool
+  default = true
+}
+
+resource "example_database" "example" {
+  lifecycle {
+    prevent_destroy = var.prevent_destroy_database
+  }
+}</code></pre>
+
+<figure>
+<div class="diagram">
+<svg viewBox="0 0 760 200" role="img" aria-labelledby="t2 d2">
+  <title id="t2">One module, different guard rails per environment</title>
+  <desc id="d2">A single database module defaults prevent_destroy to true. The sandbox environment sets prevent_destroy_database to false so it can be torn down and rebuilt on a schedule. Dev and prod keep the safe default of true.</desc>
+  <defs><marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker></defs>
+  <rect class="box-accent" x="16" y="66" width="230" height="70" rx="12"/>
+  <text x="32" y="94" font-weight="700" font-size="14">module "database"</text>
+  <text x="32" y="116" font-size="12" class="mono">prevent_destroy = var.…</text>
+  <path class="arrow" d="M246 101 C 330 101, 330 40, 420 40" marker-end="url(#ah2)"/>
+  <path class="arrow" d="M246 101 H 420" marker-end="url(#ah2)"/>
+  <path class="arrow" d="M246 101 C 330 101, 330 162, 420 162" marker-end="url(#ah2)"/>
+  <rect class="box-warn" x="426" y="14" width="318" height="52" rx="10"/>
+  <text x="442" y="36" font-size="13" font-weight="600">sandbox</text>
+  <text x="442" y="54" font-size="12" class="mono">prevent_destroy_database = false</text>
+  <rect class="box" x="426" y="76" width="318" height="52" rx="10"/>
+  <text x="442" y="98" font-size="13" font-weight="600">dev</text>
+  <text x="442" y="116" font-size="12" class="muted">default (true)</text>
+  <rect class="box" x="426" y="138" width="318" height="52" rx="10"/>
+  <text x="442" y="160" font-size="13" font-weight="600">prod</text>
+  <text x="442" y="178" font-size="12" class="muted">default (true), with no override in the repo at all</text>
+</svg>
+</div>
+<figcaption>Safe by default, with an explicit opt-out for environments that are designed to be torn down and rebuilt.</figcaption>
+</figure>
+
+<p>I look after a sandbox environment that is destroyed and rebuilt on a schedule, so this matters to me. The safe default stays in the module, and the one environment that needs to be disposable says so explicitly, in a line a reviewer will notice.</p>
+
+<p>1.12 also added <code>lifecycle { destroy = false }</code>. It lets you remove an object from state without destroying the real resource. That's useful when a resource moves to another stack or is handed to another team. Before, this meant running <code>tofu state rm</code> in a terminal, with no review and no record. Now it's a code change that goes through a PR like everything else.</p>
+
+<h2>Smaller things I noticed</h2>
+<ul>
+  <li><strong><code>-json-into=FILE</code></strong> (1.12). Machine-readable output goes to a file, and the normal human-readable output stays in the terminal. CI pipelines no longer have to choose between logs people can read and output tools can parse.</li>
+  <li><strong>Linting, experimental</strong> (1.13). Basic linting is available through a <code>-lint</code> flag on supported commands. It's early, but a linter built into the tool could mean one less separate tool to keep pinned in CI.</li>
+  <li><strong>Symbol Libraries, experimental</strong> (1.13). These are shared type definitions and user-defined functions written in HCL. The maintainers call the syntax "just a starting point", so I'm watching rather than adopting, but it targets real copy-paste pain across modules.</li>
+  <li><strong>Saved plans include provider schemas</strong>, so <code>tofu show</code> on a plan file can often skip starting providers. Plan-review jobs get faster.</li>
+  <li><strong>Windows on ARM64</strong> is now an official platform.</li>
+</ul>
+
+<h2>Upgrade notes that will bite someone</h2>
+<div class="callout">Read these before you change the version pin in your CI image.</div>
+<ul>
+  <li><strong>WinRM is gone.</strong> It was deprecated in 1.12, and a <code>connection</code> block with <code>type = "winrm"</code> is now an error. The <code>remote-exec</code> and <code>file</code> provisioners lost WinRM support.</li>
+  <li><strong><code>base64gzip</code> output changed.</strong> It's "equivalent but not byte-for-byte identical", so resources that store that output may show a diff. Plan before you apply, and use <code>ignore_changes</code> if you need to.</li>
+  <li><strong>macOS 13 Ventura or later</strong> is now required.</li>
+  <li><strong>Last release series for 32-bit builds.</strong> 1.13 is the last series with official <code>386</code> and <code>arm</code> builds, and 1.14 drops them. Check old self-hosted runners.</li>
+  <li><strong>Stricter SSH parsing.</strong> Some invalid input that was accepted before is now rejected.</li>
+</ul>
+
+<h2>Where this leaves OpenTofu</h2>
+
+<p>Looking back over the last few releases, OpenTofu has steadily fixed long-standing annoyances. 1.10 brought OCI registry support for providers and modules, and native S3 state locking without DynamoDB. 1.11 added ephemeral resources and the <code>enabled</code> meta-argument. 1.12 made <code>prevent_destroy</code> dynamic. 1.13 cleaned up plans.</p>
+
+<p>None of these are headline features. Each one is a workaround I can delete. As someone who reviews more plans than I write, that kind of release suits me.</p>
+
+<p>My upgrade plan: move CI to 1.13.8, run plans across every stack and check for <code>base64gzip</code> diffs, then start adding <code>assume…</code> functions to the modules with the noisiest plans.</p>
+
+<div class="sources">
+  <strong>Sources</strong>
+  <ul>
+    <li><a href="https://opentofu.org/blog/opentofu-1-13-0/">OpenTofu v1.13.0</a> (release post)</li>
+    <li><a href="https://opentofu.org/blog/opentofu-1-12-0/">OpenTofu v1.12.0</a> (release post)</li>
+    <li><a href="https://github.com/opentofu/opentofu/blob/v1.13/CHANGELOG.md">OpenTofu 1.13 CHANGELOG</a></li>
+    <li><a href="https://github.com/opentofu/opentofu/releases">OpenTofu releases on GitHub</a></li>
+    <li><a href="https://opentofu.org/blog/opentofu-1-11-0/">OpenTofu v1.11.0</a> and <a href="https://opentofu.org/blog/opentofu-1-10-0/">v1.10.0</a> (context)</li>
+  </ul>
+  <p>Views are my own, written for my personal blog.</p>
+</div>
+</article>
+</div>
+</body>
+</html>

@@ -37,6 +37,13 @@ Visitor ──► stephen-marshal.github.io  (GitHub Pages: public login screen 
 | `firebase-config.js` | Firebase web config and the owner email |
 | `style.css` | Styles, including light/dark theme and print layout |
 | `.nojekyll` | Tells GitHub Pages to serve the files as they are |
+| `blog/` | Public blog: `index.html` lists posts, one folder per post (`blog/<slug>/index.html`), shared `blog.css`. Diagrams are inline SVG. |
+
+### Add a blog post
+1. Copy an existing `blog/<slug>/` folder and rename it to the new slug, then edit the post.
+2. Add it to `blog/index.html`, newest first.
+3. Add it to the **Writing** section of `cv-content.html` and publish that through `visitors.html`.
+4. Commit and push.
 
 Kept locally in `~/dev/repos/personal/cv-private/` (not published):
 

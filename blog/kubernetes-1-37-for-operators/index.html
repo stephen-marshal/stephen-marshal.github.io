@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kubernetes v1.37 for Operators — Stephen Marshall</title>
+<meta name="description" content="Kubernetes v1.37 'Garhwal' read from the platform engineer's chair: the deprecations that start the clock, the GA features worth using, and the post-Ingress-NGINX world.">
+<meta property="og:title" content="Kubernetes v1.37, read from the operator's chair">
+<meta property="og:type" content="article">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../style.css">
+<link rel="stylesheet" href="../blog.css">
+</head>
+<body>
+<div class="wrap">
+<nav class="topnav"><a href="../../">Stephen Marshall</a><a href="../">← All posts</a></nav>
+
+<article>
+<div class="meta">5 November 2026 · Kubernetes · 8 min read</div>
+<h1>Kubernetes v1.37, read from the operator's chair</h1>
+<p class="lede">Release posts list everything that changed. This one is about what changes for the people who run the clusters.</p>
+
+<p>Kubernetes v1.37 "Garhwal" came out on 26 August 2026, with 67 enhancements. I didn't read the release post that week. I was busy upgrading a service mesh across three clusters, which taught me (again) that most upgrade problems are versions you lost track of, not new features.</p>
+
+<p>So I've reread the release notes the way I read a change request: what will break, what has started a countdown, and what is good enough to use now. My clusters are still on 1.34, so v1.37 is three control-plane upgrades away. That distance makes the deprecations more important to me than the new features.</p>
+
+<h2>The clocks that started ticking</h2>
+
+<p>A deprecation doesn't break anything on the day it's announced. It sets a date for later. In this release cycle, four changes set dates that will matter to most operators:</p>
+
+<ul>
+  <li><strong>kube-proxy <code>ipvs</code> mode is deprecated</strong> (KEP-5495). The project says that by v1.40 it is "expected to be disabled by default (still selectable via the feature gate)", and by v1.43 "support for <code>ipvs</code> mode would be removed entirely." Clusters now log a deprecation warning at startup. If you chose IPVS years ago for performance, plan a move to <code>nftables</code> mode.</li>
+  <li><strong>kube-dns is deprecated.</strong> No new packages are expected after v1.40. Most clusters moved to CoreDNS long ago, but older self-managed ones may still run kube-dns.</li>
+  <li><strong>Static Pods can no longer reference Secrets or ConfigMaps</strong>, and the <code>PreventStaticPodAPIReferences</code> gate that let you opt out has been removed. If an old bootstrap script relies on this, it breaks on v1.37.</li>
+  <li><strong>cgroup v1 support is on its way out</strong> (KEP-5573). <code>failCgroupV1</code> has defaulted to <code>true</code> since v1.35. Setting <code>failCgroupV1: false</code> still works as a temporary override in v1.37, but support "is planned to be removed in a future release."</li>
+</ul>
+
+<p>Add the v1.36 changes you may have missed. The <code>gitRepo</code> volume plugin is now permanently disabled. Service <code>.spec.externalIPs</code> is deprecated, with removal planned for v1.43. Together, these give the timeline below.</p>
+
+<figure>
+<div class="diagram">
+<svg viewBox="0 0 760 300" role="img" aria-labelledby="t1 d1">
+  <title id="t1">Kubernetes deprecation timeline, v1.35 to v1.43</title>
+  <desc id="d1">Six rows show when each change starts and ends: cgroup v1 fail-by-default from v1.35 with removal in a future release; Service externalIPs deprecated v1.36, removed v1.43; gitRepo volume disabled in v1.36; kube-proxy ipvs deprecated v1.37, off by default v1.40, removed v1.43; kube-dns deprecated v1.37 with no packages after v1.40; static Pod API references blocked in v1.37.</desc>
+  <!-- columns: x = 220 + (minor-35)*62 -->
+  <g class="muted" font-size="12" text-anchor="middle">
+    <text x="220" y="28">1.35</text><text x="282" y="28">1.36</text><text x="344" y="28">1.37</text><text x="406" y="28">1.38</text><text x="468" y="28">1.39</text><text x="530" y="28">1.40</text><text x="592" y="28">1.41</text><text x="654" y="28">1.42</text><text x="716" y="28">1.43</text>
+  </g>
+  <g class="line">
+    <line x1="220" y1="38" x2="220" y2="280"/><line x1="282" y1="38" x2="282" y2="280"/><line x1="344" y1="38" x2="344" y2="280" style="stroke:var(--accent);stroke-width:2"/><line x1="406" y1="38" x2="406" y2="280"/><line x1="468" y1="38" x2="468" y2="280"/><line x1="530" y1="38" x2="530" y2="280"/><line x1="592" y1="38" x2="592" y2="280"/><line x1="654" y1="38" x2="654" y2="280"/><line x1="716" y1="38" x2="716" y2="280"/>
+  </g>
+  <text x="344" y="294" text-anchor="middle" font-size="11" font-weight="600" style="fill:var(--accent)">you are here (v1.37)</text>
+
+  <g font-size="13">
+    <text x="12" y="66">cgroup v1</text>
+    <rect class="bar" x="220" y="54" width="520" height="16" rx="8"/>
+    <circle class="dot" cx="220" cy="62" r="6"/>
+    <text x="232" y="88" font-size="11" class="muted">failCgroupV1 = true by default → removal "in a future release"</text>
+
+    <text x="12" y="116">Service externalIPs</text>
+    <rect class="bar" x="282" y="104" width="434" height="16" rx="8"/>
+    <circle class="dot" cx="282" cy="112" r="6"/><circle class="dot-warn" cx="716" cy="112" r="6"/>
+    <text x="294" y="138" font-size="11" class="muted">deprecated (warnings) → removed</text>
+
+    <text x="12" y="166">gitRepo volume</text>
+    <circle class="dot-warn" cx="282" cy="162" r="6"/>
+    <text x="294" y="166" font-size="11" class="muted">permanently disabled, can't be turned back on</text>
+
+    <text x="12" y="200">kube-proxy ipvs</text>
+    <rect class="bar" x="344" y="188" width="372" height="16" rx="8"/>
+    <circle class="dot" cx="344" cy="196" r="6"/><circle class="dot-hollow" cx="530" cy="196" r="6"/><circle class="dot-warn" cx="716" cy="196" r="6"/>
+    <text x="356" y="222" font-size="11" class="muted">deprecated → off by default (v1.40) → removed (v1.43)</text>
+
+    <text x="12" y="248">kube-dns</text>
+    <rect class="bar" x="344" y="236" width="186" height="16" rx="8"/>
+    <circle class="dot" cx="344" cy="244" r="6"/><circle class="dot-warn" cx="530" cy="244" r="6"/>
+    <text x="542" y="248" font-size="11" class="muted">no new packages after v1.40</text>
+
+    <text x="12" y="276">static Pod → Secret/CM</text>
+    <circle class="dot-warn" cx="344" cy="272" r="6"/>
+    <text x="356" y="276" font-size="11" class="muted">blocked, opt-out gate removed</text>
+  </g>
+</svg>
+</div>
+<figcaption>Deprecation timeline from the v1.36 and v1.37 release posts. Filled blue dot: change starts. Hollow dot: becomes the default. Red dot: removed or blocked.</figcaption>
+</figure>
+
+<p>The timeline makes one thing obvious. <strong>v1.43 removes both IPVS and <code>externalIPs</code>.</strong> If either is buried in an old Helm chart, you'll be glad to find it in 2026 rather than discover it at an upgrade gate in 2028.</p>
+
+<h3>How I'm finding the stragglers</h3>
+<p>The API server already tells you which deprecated APIs are still being called. I check this metric before every upgrade:</p>
+<pre><code>kubectl get --raw /metrics | grep apiserver_requested_deprecated_apis</code></pre>
+<p>Each line includes a <code>removed_release</code> label, so you can sort by urgency. For the kube-proxy mode, check the kube-proxy ConfigMap (or your managed add-on's configuration) on each cluster. For IPVS in particular, run that check now rather than at v1.40.</p>
+
+<h2>Life after Ingress NGINX</h2>
+
+<p>The biggest operational news of 2026 wasn't in a release at all. <strong>Ingress NGINX was retired on 24 March 2026.</strong> The original announcement was blunt: "there will be no further releases, no bugfixes, and no updates to resolve any security vulnerabilities that may be discovered." Existing installs keep working, which is exactly why it's easy to ignore.</p>
+
+<p>The official advice from SIG Network and the Security Response Committee is to start migrating immediately, either to Gateway API (the recommended path) or to another Ingress controller. One line from their January statement stuck with me: "None of the available alternatives are direct drop-in replacements." That's been my experience too. The YAML is the easy part. The hard part is the annotations nobody wrote down and the regex rewrites someone added in 2021.</p>
+
+<figure>
+<div class="diagram">
+<svg viewBox="0 0 760 250" role="img" aria-labelledby="t2 d2">
+  <title id="t2">From Ingress NGINX to Gateway API</title>
+  <desc id="d2">On the left, a single Ingress resource whose behaviour is split across the controller and annotations, served by the retired ingress-nginx controller. An arrow labelled ingress2gateway leads to the right, where Gateway API splits the same job into three resources owned by different roles: GatewayClass owned by the infrastructure provider, Gateway owned by the platform team, and HTTPRoute owned by application teams.</desc>
+  <rect class="box-warn" x="16" y="40" width="250" height="170" rx="12"/>
+  <text x="34" y="70" font-weight="700" font-size="15">Ingress + ingress-nginx</text>
+  <text x="34" y="92" font-size="12" class="muted">retired 24 March 2026</text>
+  <rect class="box" x="34" y="108" width="214" height="34" rx="8"/>
+  <text x="46" y="130" font-size="13" class="mono">kind: Ingress</text>
+  <rect class="box" x="34" y="152" width="214" height="40" rx="8"/>
+  <text x="46" y="170" font-size="12">behaviour hidden in</text>
+  <text x="46" y="185" font-size="12" class="mono">nginx.ingress…/annotations</text>
+
+  <path class="arrow" d="M276 125 H 372" marker-end="url(#ah)"/>
+  <text x="324" y="114" text-anchor="middle" font-size="12" font-weight="600">ingress2gateway</text>
+  <text x="324" y="146" text-anchor="middle" font-size="11" class="muted">+ manual review</text>
+
+  <g font-size="13">
+    <rect class="box-accent" x="388" y="22" width="356" height="56" rx="12"/>
+    <text x="406" y="46" font-weight="700" class="mono">GatewayClass</text>
+    <text x="406" y="66" font-size="12" class="muted">which implementation · owned by the infrastructure provider</text>
+    <rect class="box-accent" x="388" y="96" width="356" height="56" rx="12"/>
+    <text x="406" y="120" font-weight="700" class="mono">Gateway</text>
+    <text x="406" y="140" font-size="12" class="muted">listeners, TLS, ports · owned by the platform team</text>
+    <rect class="box-accent" x="388" y="170" width="356" height="56" rx="12"/>
+    <text x="406" y="194" font-weight="700" class="mono">HTTPRoute</text>
+    <text x="406" y="214" font-size="12" class="muted">paths, headers, backends · owned by app teams</text>
+    <path class="arrow" d="M566 78 V 96" marker-end="url(#ah)"/>
+    <path class="arrow" d="M566 152 V 170" marker-end="url(#ah)"/>
+  </g>
+  <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker></defs>
+</svg>
+</div>
+<figcaption>Gateway API's main improvement is ownership: one Ingress object with annotations becomes three resources that each match a role.</figcaption>
+</figure>
+
+<p>The first step is a one-liner from the retirement post. It's worth running against every cluster you own, including the "temporary" ones:</p>
+<pre><code>kubectl get pods --all-namespaces --selector app.kubernetes.io/name=ingress-nginx</code></pre>
+<p>Ingress2Gateway reached 1.0 in March and will turn most of your Ingress objects into Gateway API resources. Treat its output as a first draft, not a finished migration. The project's "Before You Migrate" post lists five ingress-nginx behaviours that will surprise you, and it's worth reading before the first route goes live.</p>
+
+<h2>What graduated that I'd actually use</h2>
+
+<p>Sixteen features went GA in v1.37. Most are niche, but these are the ones I'm excited about:</p>
+
+<ul>
+  <li><strong>Pod Certificates (KEP-4317) and ClusterTrustBundles (KEP-3257).</strong> These are built-in ways to give Pods X.509 identities and distribute CA bundles. Not every workload needs a mesh or an extra controller just to get a certificate, and this is a big step towards that.</li>
+  <li><strong>Configurable HPA tolerance (KEP-4951).</strong> The global 10% tolerance has been the cause of plenty of "why won't it scale?" incidents. Now you can set it per HPA.</li>
+  <li><strong>Storage Version Migrator moves in-tree (KEP-4192).</strong> Re-encrypting Secrets or migrating CRD storage versions used to need an extra component that was easy to forget. Having it built in makes those jobs a routine task instead of a project.</li>
+  <li><strong>KYAML (KEP-5295).</strong> A stricter, unambiguous YAML subset for Kubernetes output, which avoids problems like "Norway is false". It's a small change, but I've lost real hours to whitespace.</li>
+  <li><strong>DRA, keeps growing.</strong> Device taints and tolerations, resource health in Pod status, and a standard <code>numaNode</code> attribute all reached GA. If you run GPUs, Dynamic Resource Allocation is no longer experimental.</li>
+</ul>
+
+<p>Two alpha features also stood out. A <code>Recreate</code> strategy for StatefulSet rollouts (KEP-3541) is something I've been working around for years. Node lifecycle conditions like <code>DrainInProgress</code> and <code>MaintenancePlanned</code> (KEP-5683) could finally give drain tooling a shared language.</p>
+
+<h2>My checklist for the next hop</h2>
+<ol>
+  <li>Run the ingress-nginx selector on every cluster, and book in the Gateway API migration.</li>
+  <li>Check the <code>apiserver_requested_deprecated_apis</code> metric and sort by <code>removed_release</code>.</li>
+  <li>Find out which kube-proxy mode each cluster runs. If it's IPVS, plan the move now.</li>
+  <li>Check that every node is on cgroup v2, especially old node images.</li>
+  <li>Search bootstrap scripts for static Pods that reference Secrets or ConfigMaps.</li>
+  <li>Upgrade one minor version at a time, and stay within the version skew policy for kubelets.</li>
+</ol>
+
+<p>None of this is glamorous, and that's the point. The best upgrade I ever did was the one nobody noticed, because the prep work happened months earlier.</p>
+
+<div class="sources">
+  <strong>Sources</strong>
+  <ul>
+    <li><a href="https://kubernetes.io/blog/2026/08/26/kubernetes-v1-37-release/">Kubernetes v1.37: Garhwal</a> (release post)</li>
+    <li><a href="https://kubernetes.io/blog/2026/04/22/kubernetes-v1-36-release/">Kubernetes v1.36: Haru</a> (release post)</li>
+    <li><a href="https://kubernetes.io/blog/2025/11/11/ingress-nginx-retirement/">Ingress NGINX Retirement: What You Need to Know</a></li>
+    <li><a href="https://kubernetes.io/blog/2026/01/29/ingress-nginx-statement/">Ingress NGINX statement (January 2026)</a></li>
+    <li><a href="https://kubernetes.io/blog/2026/03/20/ingress2gateway-1-0-release/">Announcing Ingress2Gateway 1.0</a></li>
+    <li><a href="https://kubernetes.io/blog/2026/02/27/ingress-nginx-before-you-migrate/">Before You Migrate: Five Surprising Ingress-NGINX Behaviors</a></li>
+  </ul>
+  <p>Views are my own, written for my personal blog.</p>
+</div>
+</article>
+</div>
+</body>
+</html>
