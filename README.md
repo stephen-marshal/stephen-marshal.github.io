@@ -38,6 +38,7 @@ Visitor ──► stephen-marshal.github.io  (GitHub Pages: public login screen 
 | `style.css` | Styles, including light/dark theme and print layout |
 | `.nojekyll` | Tells GitHub Pages to serve the files as they are |
 | `blog/` | Public blog: `index.html` lists posts, one folder per post (`blog/<slug>/index.html`), shared `blog.css`. Diagrams are inline SVG. |
+| `terminal.js` | Interactive `kubectl` terminal on the homepage. Public resources (engineer, linkedin, blog, articles, how-i-work, dog) work for everyone. CV resources (summary, skills, experience / `logs career`, certifications, education, writing) are read from the signed-in CV in `#cv`, and return a "Forbidden + sign in" message when signed out. Blog and article lists come from the homepage cards. **The public "How I Work" list is copied in `PRINCIPLES`; keep it in step with `cv-content.html`.** `app.js` sends `cv:auth` and `cv:ready` events to it. |
 | `articles/` | Index of longer articles published on Medium (links out). Reached from the "Articles" button in the header. |
 
 ### Add a Medium article

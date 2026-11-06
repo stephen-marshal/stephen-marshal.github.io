@@ -93,6 +93,8 @@ function buildNav() {
 onAuthStateChanged(auth, async (user) => {
   $("loading").hidden = true;
   document.body.classList.toggle("signed-in", !!user);
+  // Tell the homepage terminal (terminal.js) who is signed in.
+  window.dispatchEvent(new CustomEvent("cv:auth", { detail: { user: user ? (user.email || user.displayName || "you") : null } }));
   if (!user) {
     $("cvnav").hidden = true;
     $("gate").hidden = false;
@@ -120,6 +122,7 @@ onAuthStateChanged(auth, async (user) => {
     $("cv").hidden = false;
     $("actions").hidden = false;
     buildNav();
+    if (snap.exists()) window.dispatchEvent(new CustomEvent("cv:ready"));
   } catch (e) {
     $("cv").innerHTML = '<p class="loading">Could not load the CV. Please refresh.</p>';
     $("cv").hidden = false;
