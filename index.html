@@ -12,7 +12,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,400&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
 <script src="theme.js?v=4"></script>
-<link rel="stylesheet" href="style.css?v=6">
+<link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
 <div class="wrap">
@@ -82,6 +82,21 @@
     </figure>
   </header>
 
+  <section class="term-wrap" id="terminal" aria-label="Interactive terminal: explore my profile with kubectl commands">
+    <div class="term">
+      <div class="term-bar">
+        <i style="background:#ff5f56"></i><i style="background:#ffbd2e"></i><i style="background:#27c93f"></i>
+        <span class="term-title">stephen-cv — kubectl</span>
+        <span class="term-state" id="term-state">🔒 public</span>
+      </div>
+      <div class="term-body" id="term-body">
+        <div id="term-out" aria-live="polite"></div>
+        <label class="term-input"><span class="p" id="term-prompt">guest@stephen-cv:~$</span><input id="term-input" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go" aria-label="Type a command, for example kubectl get skills" placeholder="type help"></label>
+      </div>
+    </div>
+    <div class="term-chips" id="term-chips"></div>
+  </section>
+
   <nav class="cv-nav" id="cvnav" aria-label="CV sections" hidden></nav>
 
   <section class="latest" id="latest">
@@ -121,6 +136,7 @@
   <div id="cv" hidden></div>
 
 </div>
-<script type="module" src="app.js?v=4"></script>
+<script type="module" src="terminal.js?v=1"></script>
+<script type="module" src="app.js?v=5"></script>
 </body>
 </html>
