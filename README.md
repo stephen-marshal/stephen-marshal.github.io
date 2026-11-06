@@ -38,6 +38,12 @@ Visitor ──► stephen-marshal.github.io  (GitHub Pages: public login screen 
 | `style.css` | Styles, including light/dark theme and print layout |
 | `.nojekyll` | Tells GitHub Pages to serve the files as they are |
 | `blog/` | Public blog: `index.html` lists posts, one folder per post (`blog/<slug>/index.html`), shared `blog.css`. Diagrams are inline SVG. |
+| `articles/` | Index of longer articles published on Medium (links out). Reached from the "Articles" button in the header. |
+
+### Add a Medium article
+1. Add it to `articles/index.html`, newest first, with a two-line **Takeaway** and **Why read**.
+2. Add a card to the **Articles on Medium** section in `index.html`. This section shows only when signed out.
+3. Commit and push.
 
 ### Add a blog post
 1. Copy an existing `blog/<slug>/` folder and rename it to the new slug, then edit the post.
