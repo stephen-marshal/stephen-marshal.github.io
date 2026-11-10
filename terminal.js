@@ -1,7 +1,7 @@
 // Interactive kubectl-style terminal on the homepage.
 // Public resources work for everyone; CV resources unlock after sign-in and are read
 // from the CV HTML that app.js loads into #cv (so there is no second copy to maintain).
-// Blog and article lists are read from the homepage cards (#latest, #articles).
+// Blog, article and project lists are read from the homepage cards (#latest, #articles, #projects).
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -24,6 +24,7 @@ const RES = {
   linkedin: ["linkedin", "li"],
   blog: ["blog", "blogs", "posts", "post"],
   articles: ["articles", "article", "medium"],
+  projects: ["projects", "project", "proj", "deployments", "deploy", "councilofmodels", "council"],
   "how-i-work": ["how-i-work", "howiwork", "principles", "principle", "how-i-works"],
   dog: ["dog", "dogs", "pup", "puppy"],
   summary: ["summary", "about"],
@@ -37,12 +38,12 @@ const RES = {
 const GATED = new Set(["summary", "skills", "experience", "certifications", "education", "writing", "outside"]);
 const CV_HEADING = { summary: "summary", skills: "skills", experience: "experience", certifications: "certifications", education: "education", writing: "writing", "how-i-work": "how i work" };
 
-const PUBLIC_CHIPS = ["kubectl describe engineer stephen", "kubectl get articles", "kubectl get blog", "kubectl get how-i-work", "kubectl get linkedin", "kubectl describe dog", "help"];
+const PUBLIC_CHIPS = ["kubectl describe engineer stephen", "kubectl get projects", "kubectl get articles", "kubectl get blog", "kubectl get how-i-work", "kubectl get linkedin", "kubectl describe dog", "help"];
 const PRIVATE_CHIPS = ["kubectl get summary", "kubectl get skills", "kubectl logs career", "kubectl get experience", "kubectl get certifications", "kubectl get education", "kubectl get writing", "help"];
 const COMPLETIONS = [
   "help", "clear", "whoami", "history",
   "kubectl get engineer", "kubectl describe engineer stephen", "kubectl get linkedin", "kubectl get blog", "kubectl get articles",
-  "kubectl get how-i-work", "kubectl describe dog", "kubectl top engineer", "kubectl api-resources",
+  "kubectl get projects", "kubectl describe projects", "kubectl get how-i-work", "kubectl describe dog", "kubectl top engineer", "kubectl api-resources",
   "kubectl get summary", "kubectl get skills", "kubectl logs career", "kubectl get experience", "kubectl describe experience ",
   "kubectl get certifications", "kubectl get education", "kubectl get writing", "kubectl get outside",
   "kubectl auth login", "kubectl auth logout", "kubectl auth whoami",
@@ -91,7 +92,7 @@ function init() {
 
   // ---------- resources ----------
   function getEngineer() {
-    table(["NAME", "ROLE", "STATUS", "LINKS"], [["stephen-marshall", "DevOps · SRE · Platform Engineering", "Running", "linkedin, blog, articles"]]);
+    table(["NAME", "ROLE", "STATUS", "LINKS"], [["stephen-marshall", "DevOps · SRE · Platform Engineering", "Running", "linkedin, blog, articles, projects"]]);
     line(`<span class="m">Next:</span> ${cmd("kubectl describe engineer stephen")}`);
   }
   function describeEngineer() {
@@ -105,6 +106,7 @@ function init() {
       `  LinkedIn:   ${link(LINKEDIN, "linkedin.com/in/stephenmarshallsheerness")}`,
       `  Blog:       ${link("blog/", "stephen-marshal.github.io/blog")}`,
       `  Articles:   ${link("articles/", "stephen-marshal.github.io/articles")}`,
+      `  Projects:   ${link("#projects", "stephen-marshal.github.io/#projects")}`,
       `<span class="k">Status:</span>       Running`,
       `<span class="k">Events:</span>`,
       `  <span class="m">Type     Reason      Message</span>`,
@@ -123,6 +125,16 @@ function init() {
     });
     blank();
     line(more);
+  }
+  function getProjects() {
+    const list = cards("#projects");
+    if (!list.length) return line("No projects yet.", "m");
+    table(["NAME", "ROLE", "STATUS", "URL"], list.map((c) => {
+      const parts = c.meta.split("·").map(clean);
+      const live = parts.find((x) => /^live/i.test(x));
+      return [c.title.toLowerCase().replace(/\s+/g, "-"), parts[0] || "-", live ? "Running" : "Building", c.href.replace(/^https?:\/\//, "").replace(/\/$/, "")];
+    }));
+    line(`<span class="m">Open:</span> ${list.map((c) => link(c.href, c.title)).join(" · ")} <span class="m">· Next:</span> ${cmd("kubectl describe projects")}`);
   }
   function getHowIWork() {
     const sec = section("how-i-work");
@@ -205,7 +217,7 @@ function init() {
   function help() {
     line(`<span class="k">Public</span>`);
     [["kubectl get engineer", "who I am"], ["kubectl describe engineer stephen", "the longer version"], ["kubectl get linkedin", "connect with me"],
-     ["kubectl get blog", "posts on this site"], ["kubectl get articles", "longer pieces on Medium"], ["kubectl get how-i-work", "my working principles"],
+     ["kubectl get blog", "posts on this site"], ["kubectl get articles", "longer pieces on Medium"], ["kubectl get projects", "things I've built and run"], ["kubectl get how-i-work", "my working principles"],
      ["kubectl describe dog", "the other one in the photo"]]
       .forEach(([c, d]) => line(`  ${cmd(c)} <span class="m">${d}</span>`));
     blank();
@@ -245,6 +257,7 @@ function init() {
       case "linkedin": return line(`${link(LINKEDIN, "linkedin.com/in/stephenmarshallsheerness")} <span class="m">· say hello, I read every message</span>`);
       case "blog": return getList("#latest", "No posts yet.", `<span class="m">All posts:</span> ${link("blog/", "stephen-marshal.github.io/blog")}`);
       case "articles": return getList("#articles", "No articles yet.", `<span class="m">All articles:</span> ${link("articles/", "stephen-marshal.github.io/articles")} · ${link(MEDIUM, "Medium profile")}`);
+      case "projects": return verb === "describe" ? getList("#projects", "No projects yet.", `<span class="m">See them on the page:</span> ${link("#projects", "Projects")}`) : getProjects();
       case "how-i-work": return getHowIWork();
       case "dog": return verb === "describe" ? describeDog() : table(["NAME", "READY", "STATUS", "RESTARTS"], [["chief-morale-officer", "1/1", "Napping", "0 (never)"]]);
       case "summary": return getSummary();
@@ -278,8 +291,8 @@ function init() {
       case "sudo": return line(`${esc(user || "guest")} is not in the sudoers file. This incident will be reported.`, "e");
       case "open": {
         const r = resolve(rest[0]);
-        const url = { linkedin: LINKEDIN, blog: "blog/", articles: "articles/" }[r];
-        if (!url) return line("Usage: open linkedin | blog | articles", "m");
+        const url = { linkedin: LINKEDIN, blog: "blog/", articles: "articles/", projects: "https://councilofmodels.uk" }[r];
+        if (!url) return line("Usage: open linkedin | blog | articles | projects", "m");
         line(`Opening ${esc(r)}…`, "m");
         return url.startsWith("http") ? window.open(url, "_blank", "noopener") : (location.href = url);
       }
