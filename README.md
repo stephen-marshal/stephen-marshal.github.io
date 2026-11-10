@@ -24,7 +24,7 @@ Visitor ──► stephen-marshal.github.io  (GitHub Pages: public login screen 
 ```
 
 - **The CV text is not in this repo.** It lives in Firestore and is only sent to signed-in users.
-  The master copy is kept locally in `~/dev/repos/personal/cv-private/cv-content.html`. That folder is not in git, so back it up.
+  The master copy is kept locally in `~/personal/cv-private/cv-content.html`. That folder is not in git, so back it up.
 - **The Firebase config in `firebase-config.js` is public by design.** Access is enforced by the Firestore security rules, not by keeping the config secret.
 
 ### Files
@@ -52,7 +52,7 @@ Visitor ──► stephen-marshal.github.io  (GitHub Pages: public login screen 
 3. Add it to the **Writing** section of `cv-content.html` and publish that through `visitors.html`.
 4. Commit and push.
 
-Kept locally in `~/dev/repos/personal/cv-private/` (not published):
+Kept locally in `~/personal/cv-private/` (not published):
 
 | File | Purpose |
 |---|---|
@@ -66,7 +66,7 @@ Kept locally in `~/dev/repos/personal/cv-private/` (not published):
 ## Everyday tasks
 
 ### Update the CV
-1. Edit `~/dev/repos/personal/cv-private/cv-content.html`.
+1. Edit `~/personal/cv-private/cv-content.html`.
 2. Open https://stephen-marshal.github.io/visitors.html and sign in with the owner Google account.
 3. Under **Publish CV content**, choose the edited `cv-content.html`. It goes live immediately.
 
@@ -77,7 +77,7 @@ You can also see the raw records in the Firebase console under **Firestore**, co
 ### Change the public page (header, quote, sign-in screen, styling)
 ```bash
 gh auth switch -u stephen-marshal          # this repo belongs to the personal GitHub account
-cd ~/dev/repos/personal/cv-site
+cd ~/personal/cv-site
 # edit index.html / style.css / app.js
 git add -A && git commit -m "..." && git push
 ```
@@ -85,7 +85,7 @@ GitHub Pages updates about a minute after each push.
 
 ### Change the security rules
 ```bash
-cd ~/dev/repos/personal/cv-private
+cd ~/personal/cv-private
 # edit firestore.rules
 npx firebase-tools --project stephen-marshall-cv deploy --only firestore:rules
 ```
