@@ -91,7 +91,7 @@ knot is cut.
 
 ### 4.7 Harness
 
-- **REQ-HARNESS-1** `node --test games/cut-the-knot/tests/` runs every unit, content and architecture check without installing anything.
+- **REQ-HARNESS-1** `node --test "games/cut-the-knot/tests/*.test.mjs"` runs every unit, content and architecture check without installing anything.
 - **REQ-HARNESS-2** CI runs the same checks, plus the end-to-end test, on every push and pull request that touches the game.
 - **REQ-HARNESS-3** Every requirement in this file is cited by at least one test, and every test cites only requirements that exist here.
 

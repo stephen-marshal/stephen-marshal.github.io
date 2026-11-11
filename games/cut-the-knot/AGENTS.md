@@ -21,7 +21,7 @@ A static browser game (no build step, no dependencies) served by GitHub Pages at
 
 ## Commands (run from the repo root)
 ```bash
-node --test games/cut-the-knot/tests/            # all fast checks (< 1 s)
+node --test "games/cut-the-knot/tests/*.test.mjs"   # all fast checks (< 1 s)
 node games/cut-the-knot/tools/e2e.mjs            # full play-through in headless Chrome
 node games/cut-the-knot/tools/serve.mjs          # play locally at http://localhost:8765/games/cut-the-knot/
 ```
