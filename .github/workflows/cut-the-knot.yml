@@ -1,0 +1,25 @@
+# Harness for games/cut-the-knot (REQ-HARNESS-2): fast checks + headless Chrome play-through.
+name: cut-the-knot
+
+on:
+  push:
+    paths: ["games/cut-the-knot/**", ".github/workflows/cut-the-knot.yml"]
+  pull_request:
+    paths: ["games/cut-the-knot/**", ".github/workflows/cut-the-knot.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Spec, unit, content and architecture checks
+        run: node --test "games/cut-the-knot/tests/*.test.mjs"
+      - name: End-to-end play-through (headless Chrome)
+        run: node games/cut-the-knot/tools/e2e.mjs
