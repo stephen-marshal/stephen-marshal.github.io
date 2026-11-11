@@ -123,9 +123,14 @@ export function parseRoute(hash) {
 
 /* ---------- progress (storage adapter may be null or throw) ---------- */
 
-export function loadProgress(storage) {
+/** Progress is stored per signed-in user so people sharing a browser don't share it. */
+export function progressKey(uid) {
+  return `${STORAGE_KEY}:${uid}`;
+}
+
+export function loadProgress(storage, key = STORAGE_KEY) {
   try {
-    const raw = storage?.getItem(STORAGE_KEY);
+    const raw = storage?.getItem(key);
     if (!raw) return {};
     const data = JSON.parse(raw);
     const out = {};
@@ -138,11 +143,11 @@ export function loadProgress(storage) {
   }
 }
 
-export function saveNightScore(storage, progress, nightId, score) {
+export function saveNightScore(storage, progress, nightId, score, key = STORAGE_KEY) {
   const best = Math.max(score, progress[nightId] ?? -1);
   const next = { ...progress, [nightId]: best };
   try {
-    storage?.setItem(STORAGE_KEY, JSON.stringify(next));
+    storage?.setItem(key, JSON.stringify(next));
   } catch {
     /* storage blocked: keep playing without saving (REQ-SAVE-1) */
   }
@@ -151,4 +156,75 @@ export function saveNightScore(storage, progress, nightId, score) {
 
 export function allDone(progress) {
   return NIGHT_IDS.every((id) => Number.isFinite(progress[id]));
+}
+
+/* ---------- v2: player records and stats (REQ-STATS-1..3) ---------- */
+
+/** The only fields a player document may hold. Mirrors cv-private/firestore.rules. */
+export const PLAYER_FIELDS = ["name", "email", "firstSeen", "lastSeen", "plays", "best", "answers", "courage", "archetype"];
+
+/** Merge saved best scores into local progress; the higher score wins, junk is ignored. */
+export function mergeProgress(local, remoteBest) {
+  const out = { ...local };
+  for (const id of NIGHT_IDS) {
+    const r = remoteBest?.[id];
+    if (Number.isFinite(r)) out[id] = Math.max(clamp(Math.round(r), 0, 100), out[id] ?? -1);
+  }
+  return out;
+}
+
+/** The data part of a player update after finishing a night (timestamps are added by auth.js). */
+export function nightUpdate({ nightId, answers, progress }) {
+  const update = { best: { [nightId]: progress[nightId] }, answers: { ...answers } };
+  if (allDone(progress)) {
+    const p = profile(progress);
+    update.courage = p.courage;
+    update.archetype = p.archetype;
+  }
+  return update;
+}
+
+function answerLabel(nightId, item, answer, night) {
+  if (nightId === "n1" || nightId === "n4") {
+    const o = item.options[answer];
+    return typeof o === "string" ? o : o?.text ?? String(answer);
+  }
+  if (nightId === "n2") return night.bins.find((b) => b.id === answer)?.label ?? String(answer);
+  if (nightId === "n3") return answer === "mine" ? "Mine" : answer === "theirs" ? "Theirs" : String(answer);
+  return String(answer);
+}
+
+/** Owner stats across all player documents, computed from the game's own content. */
+export function aggregateStats(players, nights) {
+  const finishedPlayers = players.filter((p) => Number.isFinite(p.courage));
+  const archetypes = {};
+  for (const p of finishedPlayers) if (p.archetype) archetypes[p.archetype] = (archetypes[p.archetype] ?? 0) + 1;
+  const questions = [];
+  for (const night of nights.slice(0, 4)) {
+    for (const item of night.items) {
+      let answered = 0, correct = 0;
+      const wrong = {};
+      for (const p of players) {
+        const a = p.answers?.[item.id];
+        if (a === undefined || a === null) continue;
+        answered++;
+        if (isCorrect(night.id, item, a)) correct++;
+        else { const label = answerLabel(night.id, item, a, night); wrong[label] = (wrong[label] ?? 0) + 1; }
+      }
+      const topWrong = Object.entries(wrong).sort((x, y) => y[1] - x[1])[0]?.[0] ?? null;
+      questions.push({
+        nightId: night.id, id: item.id, prompt: item.excuse ?? item.text ?? item.scene,
+        answered, correct, pct: answered ? Math.round((100 * correct) / answered) : null, topWrong,
+      });
+    }
+  }
+  questions.sort((a, b) => (a.pct ?? 101) - (b.pct ?? 101) || b.answered - a.answered);
+  return {
+    players: players.length,
+    finished: finishedPlayers.length,
+    avgCourage: finishedPlayers.length
+      ? Math.round(finishedPlayers.reduce((s, p) => s + p.courage, 0) / finishedPlayers.length) : null,
+    archetypes,
+    questions,
+  };
 }

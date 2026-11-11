@@ -255,3 +255,13 @@
 .game section { padding: 0; }
 .game .g-section { padding-top: 8px; }
 .statement + .bins { margin-top: 14px; }
+
+/* ---------- v2: sign-in gate, user bar, read-the-book ---------- */
+.g-nav { flex-wrap: wrap; align-items: baseline; }
+.g-user { font-size: 0.86rem; color: var(--muted); width: 100%; }
+.gate { margin-top: 18px; }
+.gate .privacy { font-size: 0.84rem; color: var(--muted); margin: 16px 0 0; max-width: 64ch; }
+.auth-error { color: var(--no); font-weight: 500; }
+.read-book { margin: 18px 4px 0; padding-left: 14px; border-left: 3px solid var(--accent-2); font-family: var(--display); font-style: italic; color: var(--muted); max-width: 60ch; }
+.game section.g-card { padding: 22px; }
+@media (max-width: 640px) { .game section.g-card { padding: 18px 16px; } }

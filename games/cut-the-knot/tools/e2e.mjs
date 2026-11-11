@@ -4,7 +4,10 @@
 //   node games/cut-the-knot/tools/e2e.mjs                 # play all five nights to the finale
 //   node games/cut-the-knot/tools/e2e.mjs --shots <dir>   # also save screenshots (light/dark, phone/desktop)
 //
-// Covers: REQ-FLOW-1 REQ-FLOW-2 REQ-FLOW-3 REQ-FLOW-4 REQ-FLOW-5 REQ-N1-1 REQ-N2-1 REQ-N3-1
+// Sign-in: src/auth.js is swapped for FAKE_AUTH (or blocked) via Fetch interception,
+// so production code carries no test bypass.
+// Covers: REQ-AUTH-1 REQ-AUTH-2 REQ-AUTH-3 REQ-STATS-1 REQ-BOOK-1
+//         REQ-FLOW-1 REQ-FLOW-2 REQ-FLOW-3 REQ-FLOW-4 REQ-FLOW-5 REQ-N1-1 REQ-N2-1 REQ-N3-1
 //         REQ-N3-2 REQ-N4-1 REQ-N5-1 REQ-N5-2 REQ-SHARE-1 REQ-SAVE-1
 import { spawn, execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync, existsSync } from "node:fs";
@@ -15,6 +18,18 @@ import { startServer } from "./serve.mjs";
 const args = process.argv.slice(2);
 const SHOTS = args.includes("--shots") ? args[args.indexOf("--shots") + 1] : null;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Stand-in for src/auth.js with the same API. Records writes on window for assertions.
+const FAKE_AUTH = `
+const listeners = [];
+let current = null;
+window.__e2eAuth = { writes: [], records: {} };
+export function onUser(cb) { listeners.push(cb); setTimeout(() => cb(current), 0); return () => {}; }
+export async function signIn() { current = { uid: "e2e-user", name: "E2E Player", email: "e2e@example.test" }; listeners.forEach((cb) => cb(current)); }
+export async function signOut() { current = null; listeners.forEach((cb) => cb(null)); }
+export async function loadPlayer(u) { return window.__e2eAuth.records[u.uid] ?? null; }
+export async function saveNight(u, update) { window.__e2eAuth.writes.push(JSON.parse(JSON.stringify(update))); }
+`;
 
 function findChrome() {
   const candidates = [
@@ -51,8 +66,10 @@ async function launch() {
   let id = 0;
   const pending = new Map();
   const errors = [];
+  const hooks = {};
   ws.onmessage = (ev) => {
     const msg = JSON.parse(ev.data);
+    if (hooks[msg.method]) hooks[msg.method](msg.params);
     if (msg.id && pending.has(msg.id)) {
       const { resolve, reject } = pending.get(msg.id);
       pending.delete(msg.id);
@@ -82,14 +99,21 @@ async function launch() {
     await Promise.race([exited, sleep(5000)]);
     try { rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* temp dir; OS will clean it */ }
   };
-  return { send, errors, close };
+  return { send, errors, close, hooks };
 }
 
 async function main() {
   const server = await startServer(0);
   const base = `http://127.0.0.1:${server.address().port}/games/cut-the-knot/?test=1&seed=7`;
   const chrome = await launch();
-  const { send, errors } = chrome;
+  const { send, errors, hooks } = chrome;
+  let authMode = "block";
+  await send("Fetch.enable", { patterns: [{ urlPattern: "*games/cut-the-knot/src/auth.js*", requestStage: "Request" }] });
+  hooks["Fetch.requestPaused"] = ({ requestId }) => {
+    if (authMode === "block") send("Fetch.failRequest", { requestId, errorReason: "BlockedByClient" });
+    else send("Fetch.fulfillRequest", { requestId, responseCode: 200,
+      responseHeaders: [{ name: "Content-Type", value: "text/javascript" }], body: Buffer.from(FAKE_AUTH).toString("base64") });
+  };
   const steps = [];
   const ok = (msg) => { steps.push(msg); console.log(`  ✔ ${msg}`); };
 
@@ -124,10 +148,31 @@ async function main() {
 
   try {
     await viewport(390, 844, false);
+
+    // Sign-in blocked: the game explains instead of breaking.
     await send("Page.navigate", { url: base });
-    await waitFor(`document.querySelector(".nights")`, "home screen");
-    await evaluate(`localStorage.clear()`);
+    await waitFor(`document.querySelector("[data-auth-failed]")`, "sign-in unavailable message");
+    ok("REQ-AUTH-3 a blocked sign-in SDK shows a plain message");
+    errors.length = 0; // the deliberately blocked request is logged as a network error
+
+    // Signed out: every route shows the gate with the privacy note and the book line.
+    authMode = "fake";
     await send("Page.reload");
+    await waitFor(`document.querySelector('[data-gate] [data-action="sign-in"]')`, "sign-in gate");
+    const privacy = await evaluate(`document.querySelector("[data-gate] .privacy").textContent`);
+    if (!/12 months/.test(privacy) || !/answers/.test(privacy)) throw new Error("privacy note incomplete");
+    ok("REQ-AUTH-2 privacy note shown before sign-in");
+    await waitFor(`document.querySelector("[data-read-book]")`, "read-the-book line on the gate");
+    ok("REQ-BOOK-1 the gate encourages reading the book");
+    await shot("00-gate-phone-light");
+    await go("#/night/2");
+    await waitFor(`document.querySelector("[data-gate]") && !document.querySelector('[data-action="start"]')`, "gate on a deep link");
+    await click('[data-action="sign-in"]');
+    await waitFor(`document.querySelector('[data-action="start"]') && document.querySelector("#stage h1").textContent === "Fuel or Excuse"`, "night 2 after sign-in");
+    await waitFor(`document.getElementById("g-user").textContent.includes("E2E Player")`, "signed-in user in nav");
+    ok("REQ-AUTH-1 gate on every route; sign-in keeps the deep link and shows the user");
+
+    await go("#/");
     await waitFor(`document.querySelectorAll(".night-card").length === 5`, "five nights listed");
     ok("REQ-FLOW-1 home shows the knot and five playable nights");
     await shot("01-home-phone-light");
@@ -206,13 +251,21 @@ async function main() {
     await go("#/");
     await waitFor(`document.querySelectorAll('.thread.done').length === 5 && document.querySelector('[data-action="finale"]')`, "five straight threads and finale button");
     ok("REQ-FLOW-4 finished nights straighten threads; finale offered");
-    const saved = await evaluate(`Object.keys(JSON.parse(localStorage.getItem("cut-the-knot:v1"))).length`);
+    const saved = await evaluate(`Object.keys(JSON.parse(localStorage.getItem("cut-the-knot:v1:e2e-user"))).length`);
     if (saved !== 5) throw new Error(`expected 5 saved nights, got ${saved}`);
-    ok("REQ-SAVE-1 progress persisted to localStorage");
+    ok("REQ-SAVE-1 progress persisted to localStorage under the player's own key");
+    const writes = await evaluate(`window.__e2eAuth.writes`);
+    if (writes.length !== 5) throw new Error(`expected 5 stats writes, got ${writes.length}`);
+    if (!writes.every((w) => w.best && Object.keys(w.answers).length > 0)) throw new Error("a stats write is missing best or answers");
+    const last = writes.at(-1);
+    if (!Number.isInteger(last.courage) || !last.archetype) throw new Error("final write lacks courage/archetype");
+    if (!("n3-faces" in writes.find((w) => w.best.n3 !== undefined).answers)) throw new Error("Ten Faces outcome not recorded");
+    ok("REQ-STATS-1 each finished night saves best + answers; the last adds courage and archetype");
 
     await click('[data-action="finale"]');
     await waitFor(`document.querySelector('[data-archetype]') && document.querySelector('[data-action="share"]')`, "finale profile and share");
-    ok("REQ-FLOW-5 finale shows cut knot, profile, guiding star and share");
+    await waitFor(`document.querySelector("[data-read-book]")`, "read-the-book line on the finale");
+    ok("REQ-FLOW-5 finale shows cut knot, profile, guiding star, share and the book line");
     await shot("09-finale-phone-light");
     await evaluate(`Object.defineProperty(navigator, "share", { value: undefined, configurable: true }); Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true });`);
     await click('[data-action="share"]');
@@ -225,6 +278,12 @@ async function main() {
     await evaluate("history.back()");
     await waitFor(`location.hash === "#/end" && document.querySelector('[data-archetype]')`, "back button returns to the finale");
     ok("REQ-FLOW-2 deep links and the back button route correctly");
+
+    await click('[data-action="sign-out"]');
+    await waitFor(`document.querySelector("[data-gate]") && document.getElementById("g-user").hidden`, "gate after sign-out");
+    ok("REQ-AUTH-1 signing out returns to the gate");
+    await click('[data-action="sign-in"]');
+    await waitFor(`!document.querySelector("[data-gate]")`, "signed back in");
 
     if (SHOTS) {
       await viewport(1200, 900, true);

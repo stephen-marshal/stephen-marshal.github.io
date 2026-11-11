@@ -13,10 +13,11 @@ A static browser game (no build step, no dependencies) served by GitHub Pages at
 | `SPEC.md` | **Source of truth.** Requirements with IDs (`REQ-…`). | Change this first. |
 | `src/content.js` | All text and items for the five nights. | Data only, with no functions (REQ-CONTENT-1). Write in your own words (REQ-ORIG-1). |
 | `src/engine.js` | Pure logic: RNG, scoring, profile, share text, progress. | No DOM, `window`, storage or timers (REQ-ARCH-1). |
-| `src/ui.js` | Rendering, input, timers, routing, storage. | The only file that touches the DOM. |
+| `src/ui.js` | Rendering, input, timers, routing, storage, sign-in gate. | The only file that touches the DOM. Loads `auth.js` with a dynamic import. |
+| `src/auth.js` | Firebase sign-in and the player record in `ctk_players/{uid}`. | The only file that talks to Firebase (pinned SDK 11.0.2). Keep its API small: the e2e run replaces it. |
 | `index.html`, `game.css` | Page shell and styles. | Reuse the site tokens from `/style.css` (REQ-A11Y-3). |
 | `tests/*.test.mjs` | Unit, content, architecture and traceability checks (`node:test`). | Every test name cites the `REQ-…` it covers. |
-| `tools/e2e.mjs` | Headless Chrome plays the whole game through the DevTools protocol. | Uses `?test=1` to speed up timers. |
+| `tools/e2e.mjs` | Headless Chrome plays the whole game through the DevTools protocol. | `?test=1` only speeds up timers. Sign-in is faked by intercepting `src/auth.js`, with no bypass in production code. |
 | `tools/serve.mjs` | Tiny static server for local play and e2e. | |
 
 ## Commands (run from the repo root)
@@ -38,6 +39,13 @@ CI runs both (`.github/workflows/cut-the-knot.yml`).
 - `engine.js` stays pure, and `content.js` stays data (`architecture.test.mjs`).
 - No third-party scripts, and the game files total ≤ 150 KB.
 - Content passes the safety deny-list and the originality guard (`content.test.mjs`).
+
+## Sign-in and stats (v2)
+- Players sign in with Google through the CV site's Firebase project (`/firebase-config.js`).
+- Player records live in Firestore `ctk_players/{uid}`. Allowed fields are `engine.PLAYER_FIELDS`.
+- The **security rules are not in this repo.** They live in `~/personal/cv-private/firestore.rules`. If you change `PLAYER_FIELDS`, change the rules too and deploy them:
+  `cd ~/personal/cv-private && npx firebase-tools --project stephen-marshall-cv deploy --only firestore:rules`
+- Owner stats and the answer key render on `/visitors.html`, after the owner check.
 
 ## Gotchas
 - Asset URLs carry `?v=N`. Bump it when you change a CSS or JS file so browsers don't serve a stale copy.
