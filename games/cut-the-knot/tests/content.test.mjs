@@ -138,3 +138,13 @@ test("REQ-SAFE-1 disclaimer exists and content avoids the safety deny-list", () 
   const deny = /\b(suicid\w*|self[- ]harm|wrist|abus\w*|trauma\w*|rape|kill\w*)\b/i;
   for (const [path, s] of ALL_TEXT) assert.doesNotMatch(s, deny, path);
 });
+
+test("REQ-AUTH-2 the privacy note says what, why, retention and how to delete", () => {
+  const p = META.privacy;
+  for (const word of [/name/i, /email/i, /answers/i, /scores/i, /never shared or sold/i, /12 months/, /delet/i, /@/]) assert.match(p, word);
+});
+
+test("REQ-BOOK-1 there is a line encouraging players to read the book", () => {
+  assert.match(META.readBook, /read/i);
+  assert.match(META.readBook, /The Courage to Be Disliked/);
+});

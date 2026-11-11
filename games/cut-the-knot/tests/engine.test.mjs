@@ -161,3 +161,58 @@ test("REQ-SHARE-1 REQ-FLOW-5 share text has archetype, courage and URL, nothing 
   assert.match(txt, /https:\/\/example\.org\/g\//);
   assert.doesNotMatch(txt, /@/);
 });
+
+/* ---------- v2: sign-in and stats ---------- */
+import { NIGHTS as CONTENT_NIGHTS } from "../src/content.js";
+
+test("REQ-SAVE-1 progress keys are per user and default to the v1 key", () => {
+  assert.equal(E.progressKey("abc"), `${E.STORAGE_KEY}:abc`);
+  const s = memoryStorage();
+  E.saveNightScore(s, {}, "n1", 60, E.progressKey("u1"));
+  assert.deepEqual(E.loadProgress(s, E.progressKey("u1")), { n1: 60 });
+  assert.deepEqual(E.loadProgress(s, E.progressKey("u2")), {});
+});
+
+test("REQ-STATS-1 remote best scores merge into local progress (max wins)", () => {
+  assert.deepEqual(E.mergeProgress({ n1: 50, n2: 90 }, { n1: 70, n2: 10, n9: 5, n3: "x" }), { n1: 70, n2: 90 });
+  assert.deepEqual(E.mergeProgress({ n1: 50 }, null), { n1: 50 });
+});
+
+test("REQ-STATS-1 REQ-STATS-3 night update carries best, answers, and courage only when all done", () => {
+  const partial = E.nightUpdate({ nightId: "n2", answers: { "n2-kata": "fuel" }, progress: { n1: 40, n2: 80 } });
+  assert.deepEqual(partial, { best: { n2: 80 }, answers: { "n2-kata": "fuel" } });
+  const full = E.nightUpdate({ nightId: "n5", answers: {}, progress: { n1: 90, n2: 90, n3: 90, n4: 90, n5: 90 } });
+  assert.equal(full.courage, 90);
+  assert.equal(full.archetype, "light");
+  for (const k of Object.keys(full)) assert.ok(E.PLAYER_FIELDS.includes(k), k);
+  assert.deepEqual([...E.PLAYER_FIELDS].sort(),
+    ["answers", "archetype", "best", "courage", "email", "firstSeen", "lastSeen", "name", "plays"]);
+});
+
+test("REQ-STATS-2 aggregateStats summarises players and ranks questions hardest first", () => {
+  const n1 = CONTENT_NIGHTS[0].items[0];
+  const n3 = CONTENT_NIGHTS[2].items[0];
+  const wrongN1 = (n1.correct + 1) % 3;
+  const players = [
+    { name: "A", best: { n1: 100, n2: 100, n3: 100, n4: 100, n5: 100 }, courage: 100, archetype: "light",
+      answers: { [n1.id]: n1.correct, [n3.id]: n3.owner } },
+    { name: "B", best: { n1: 20 }, answers: { [n1.id]: wrongN1, [n3.id]: n3.owner } },
+    { name: "C", best: { n1: 30 }, answers: { [n1.id]: wrongN1 } },
+  ];
+  const st = E.aggregateStats(players, CONTENT_NIGHTS);
+  assert.equal(st.players, 3);
+  assert.equal(st.finished, 1);
+  assert.equal(st.avgCourage, 100);
+  assert.deepEqual(st.archetypes, { light: 1 });
+  const q1 = st.questions.find((q) => q.id === n1.id);
+  assert.equal(q1.answered, 3);
+  assert.equal(q1.correct, 1);
+  assert.equal(q1.pct, 33);
+  assert.equal(q1.topWrong, n1.options[wrongN1]);
+  const q3 = st.questions.find((q) => q.id === n3.id);
+  assert.equal(q3.pct, 100);
+  // hardest answered question first; unanswered questions last
+  assert.equal(st.questions[0].id, n1.id);
+  assert.equal(st.questions.at(-1).answered, 0);
+  assert.equal(E.aggregateStats([], CONTENT_NIGHTS).avgCourage, null);
+});

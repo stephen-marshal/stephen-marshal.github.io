@@ -13,18 +13,24 @@ const ms = (x) => Math.max(1, Math.round(x / SPEED));
 const stage = document.getElementById("stage");
 const live = document.getElementById("live");
 const foot = document.getElementById("foot");
+const userBar = document.getElementById("g-user");
 
 const storage = (() => {
   try {
     const s = window.localStorage;
-    s.setItem("__ctk", "1");
-    s.removeItem("__ctk");
+    s.setItem("__storage_probe", "1");
+    s.removeItem("__storage_probe");
     return s;
   } catch {
     return null; // private mode or blocked: play without saving (REQ-SAVE-1)
   }
 })();
-let progress = E.loadProgress(storage);
+// Sign-in state (REQ-AUTH-1): undefined = still loading, null = signed out.
+let user;
+let A = null; // the auth module, loaded lazily (REQ-AUTH-3)
+let authFailed = false;
+let pKey = E.STORAGE_KEY;
+let progress = {};
 const rng = E.createRng(SEED);
 let lastCompleted = null;
 
@@ -130,13 +136,13 @@ function renderHome() {
         : h("p", { class: "muted" }, done
           ? `${done} of 5 threads straightened. Finish all five to cut the knot.`
           : "About a minute per night, six minutes in all. Play in order, or jump around."),
-      done ? h("p", {}, h("button", { type: "button", class: "linkbtn", onclick: resetProgress }, "Reset progress")) : null));
+      done ? h("p", {}, h("button", { type: "button", class: "linkbtn", onclick: resetProgress }, "Reset progress on this device")) : null));
   lastCompleted = null;
 }
 
 function resetProgress() {
   progress = {};
-  try { storage?.removeItem(E.STORAGE_KEY); } catch { /* ignore */ }
+  try { storage?.removeItem(pKey); } catch { /* ignore */ }
   announce("Progress reset.");
   renderHome();
 }
@@ -165,10 +171,15 @@ function renderNight(n) {
     cleanup();
     PLAYERS[night.id](body, night, finish);
   }
-  function finish(score) {
+  function finish(score, answers = {}) {
     cleanup();
-    progress = E.saveNightScore(storage, progress, night.id, score);
+    progress = E.saveNightScore(storage, progress, night.id, score, pKey);
     lastCompleted = night.id;
+    if (A && user) {
+      // REQ-STATS-1: a failed save never blocks play.
+      A.saveNight(user, E.nightUpdate({ nightId: night.id, answers, progress }))
+        .catch((e) => console.warn("Couldn't save to stats:", e?.message));
+    }
     recap(score);
   }
   function recap(score) {
@@ -217,10 +228,11 @@ function feedback(ok, verdict, ...rest) {
 /* ---------- Night 1: Cause or Goal (REQ-N1-1) ---------- */
 function playN1(body, night, done) {
   const items = E.shuffle(night.items, rng);
+  const answers = {};
   let i = 0, correct = 0;
   step();
   function step() {
-    if (i >= items.length) return done(E.ratioScore(correct, items.length));
+    if (i >= items.length) return done(E.ratioScore(correct, items.length), answers);
     const it = items[i];
     let answered = false;
     const back = h("div", { class: "face back" }, h("p", { class: "label" }, "So that…"));
@@ -239,6 +251,7 @@ function playN1(body, night, done) {
       answered = true;
       keyHandler = null;
       const ok = E.isCorrect("n1", it, k);
+      answers[it.id] = k;
       if (ok) correct++;
       opts.forEach((b, j) => { b.disabled = true; if (j === it.correct) b.classList.add("right"); else if (j === k) b.classList.add("wrong"); });
       back.append(h("p", { class: "reframe" }, it.reframe), h("p", { class: "was" }, "Because… ", it.excuse));
@@ -256,10 +269,11 @@ function playN1(body, night, done) {
 function playN2(body, night, done) {
   const items = E.shuffle(night.items, rng);
   const label = Object.fromEntries(night.bins.map((b) => [b.id, b.label]));
+  const answers = {};
   let i = 0, correct = 0;
   step();
   function step() {
-    if (i >= items.length) return done(E.ratioScore(correct, items.length));
+    if (i >= items.length) return done(E.ratioScore(correct, items.length), answers);
     const it = items[i];
     let answered = false;
     const bins = night.bins.map((b, k) => h("button", { type: "button", class: `bin bin-${b.id}`, "data-answer": b.id, onclick: () => answer(b.id) },
@@ -275,6 +289,7 @@ function playN2(body, night, done) {
       answered = true;
       keyHandler = null;
       const ok = E.isCorrect("n2", it, bin);
+      answers[it.id] = bin;
       if (ok) correct++;
       bins.forEach((b) => { b.disabled = true; if (b.dataset.answer === it.bin) b.classList.add("right"); else if (b.dataset.answer === bin) b.classList.add("wrong"); });
       const { box, next } = feedback(ok, ok ? `Yes: ${label[it.bin]}.` : `That one's ${label[it.bin]}.`, h("p", {}, it.why));
@@ -289,6 +304,7 @@ function playN2(body, night, done) {
 /* ---------- Night 3: Whose Task? (REQ-N3-1, REQ-N3-2) ---------- */
 function playN3(body, night, done) {
   const items = E.shuffle(night.items, rng);
+  const answers = {};
   let i = 0, correct = 0;
   step();
   function step() {
@@ -315,6 +331,7 @@ function playN3(body, night, done) {
       answered = true;
       keyHandler = null;
       const ok = E.isCorrect("n3", it, owner);
+      answers[it.id] = owner;
       if (ok) correct++;
       card.classList.add(owner === "mine" ? "out-left" : "out-right");
       [mine, theirs].forEach((b) => { b.disabled = true; if (b.dataset.answer === it.owner) b.classList.add("right"); else b.classList.add("wrong"); });
@@ -370,7 +387,7 @@ function playN3(body, night, done) {
         ended = true;
         cleanup();
         const moods = E.settleFaces(rng);
-        const next = button("Next →", { class: "g-btn primary", "data-action": "next", onclick: () => done(E.nightThreeScore(correct, items.length, outcome)) });
+        const next = button("Next →", { class: "g-btn primary", "data-action": "next", onclick: () => done(E.nightThreeScore(correct, items.length, outcome), { ...answers, "n3-faces": outcome }) });
         body.replaceChildren(h("section", { class: `g-card faces-end ${outcome}` },
           h("p", { class: "verdict" }, h("b", {}, f[outcome])),
           h("div", { class: "faces settled", "aria-hidden": "true" }, moods.map((m) => h("span", { class: "face-btn", "data-mood": m }, faceSvg(m)))),
@@ -423,6 +440,7 @@ const KIND = {
 };
 function playN4(body, night, done) {
   const items = E.shuffle(night.items, rng);
+  const answers = {};
   let i = 0, correct = 0, tilt = 0;
   const beam = s("g", { class: "beam" },
     s("line", { x1: "48", y1: "60", x2: "272", y2: "60" }),
@@ -444,7 +462,7 @@ function playN4(body, night, done) {
   setTilt();
   step();
   function step() {
-    if (i >= items.length) return done(E.ratioScore(correct, items.length));
+    if (i >= items.length) return done(E.ratioScore(correct, items.length), answers);
     const it = items[i];
     let answered = false;
     const opts = it.options.map((o, k) => h("button", { type: "button", class: "opt", "data-answer": String(k), onclick: () => answer(k) },
@@ -461,6 +479,7 @@ function playN4(body, night, done) {
       keyHandler = null;
       const chosen = it.options[k];
       const ok = E.isCorrect("n4", it, k);
+      answers[it.id] = k;
       if (ok) correct++;
       tilt = E.tiltAfter(tilt, chosen.kind);
       setTilt();
@@ -553,7 +572,7 @@ function playN5(body, night, done) {
         s("polyline", { points: pts, pathLength: "1" }),
         path.map(([x, y]) => s("circle", { cx: x, cy: y, r: "1.1" }))));
       const score = E.danceScore({ shown, caught, thoughtsTapped: tapped });
-      const next = button("See how you did →", { class: "g-btn primary", "data-action": "next", onclick: () => done(score) });
+      const next = button("See how you did →", { class: "g-btn primary", "data-action": "next", onclick: () => done(score, { "n5-dance": { shown, caught, thoughtsTapped: tapped } }) });
       body.replaceChildren(arena, h("div", { class: "feedback ok" },
         h("p", { class: "verdict" }, h("b", {}, `${caught} of ${shown} moments lived${tapped ? `, ${tapped} thought${tapped > 1 ? "s" : ""} chased` : ""}.`)),
         h("p", {}, night.reveal), next));
@@ -594,6 +613,7 @@ function renderEnd() {
     h("section", { class: "g-card star" },
       h("h2", {}, "Your guiding star"),
       h("p", {}, FINALE.star)),
+    h("p", { class: "read-book", "data-read-book": "" }, META.readBook),
     h("div", { class: "actions" },
       button("Share your result", { class: "g-btn primary", "data-action": "share", onclick: () => share(text, shareSlot) }),
       h("a", { class: "g-btn", href: "#/" }, "Back to the knot"),
@@ -623,12 +643,77 @@ async function share(text, slot) {
 foot.replaceChildren(
   h("p", {}, META.credit),
   h("p", {}, META.disclaimer),
-  h("p", { class: "meta" }, "Built spec-first with a test harness and no dependencies. ",
+  h("p", { class: "meta" }, "Built spec-first with a test harness, no build step and no npm packages. ",
     h("a", { href: "https://github.com/stephen-marshal/stephen-marshal.github.io/tree/main/games/cut-the-knot" }, "Read the spec and code"),
     "."));
 
+/* ---------- sign-in (REQ-AUTH-1..3) ---------- */
+function renderLoading() {
+  show(h("p", { class: "muted", "data-loading": "" }, "Loading…"));
+}
+
+function renderGate() {
+  const action = authFailed
+    ? h("p", { class: "auth-error", role: "alert", "data-auth-failed": "" }, META.authUnavailable)
+    : button("Continue with Google", { class: "g-btn primary", "data-action": "sign-in", onclick: doSignIn });
+  show(
+    h("header", { class: "g-hero" },
+      h("p", { class: "eyebrow" }, "A five-night mind game"),
+      h("h1", {}, META.title),
+      h("p", { class: "role" }, META.subtitle)),
+    knot(),
+    h("p", { class: "knot-caption" }, META.knotIntro),
+    h("section", { class: "g-card gate", "data-gate": "" },
+      h("h2", {}, META.signInTitle),
+      h("p", {}, META.signInBody),
+      action,
+      h("p", { class: "privacy" }, META.privacy)),
+    h("p", { class: "read-book", "data-read-book": "" }, META.readBook));
+}
+
+async function doSignIn() {
+  try {
+    await A.signIn();
+  } catch (e) {
+    if (e?.code !== "auth/popup-closed-by-user" && e?.code !== "auth/cancelled-popup-request") {
+      announce("Sign-in didn't complete. Please try again.");
+      console.warn("Sign-in failed:", e?.code ?? e?.message);
+    }
+  }
+}
+
+function renderUser() {
+  if (!user) { userBar.hidden = true; userBar.replaceChildren(); return; }
+  userBar.hidden = false;
+  userBar.replaceChildren(
+    h("span", {}, user.name || user.email), " · ",
+    h("button", { type: "button", class: "linkbtn", "data-action": "sign-out", onclick: () => A.signOut() }, "Sign out"));
+}
+
+async function onUserChange(u) {
+  user = u;
+  if (u) {
+    pKey = E.progressKey(u.uid);
+    progress = E.loadProgress(storage, pKey);
+    try {
+      const record = await A.loadPlayer(u);
+      progress = E.mergeProgress(progress, record?.best);
+      try { storage?.setItem(pKey, JSON.stringify(progress)); } catch { /* storage blocked */ }
+    } catch (e) {
+      console.warn("Couldn't load saved progress:", e?.message);
+    }
+  } else {
+    pKey = E.STORAGE_KEY;
+    progress = {};
+  }
+  renderUser();
+  route();
+}
+
 function route() {
   cleanup();
+  if (authFailed || user === null) return renderGate();
+  if (user === undefined) return renderLoading();
   const r = E.parseRoute(location.hash);
   if (r.name === "night") renderNight(r.n);
   else if (r.name === "end") renderEnd();
@@ -640,4 +725,12 @@ document.addEventListener("keydown", (e) => {
   keyHandler(e);
 });
 document.documentElement.classList.toggle("reduced", REDUCED);
-route();
+route(); // shows "Loading…" until sign-in state is known
+try {
+  A = await import("./auth.js");
+  A.onUser(onUserChange);
+} catch (e) {
+  authFailed = true;
+  console.warn("Sign-in unavailable:", e?.message);
+  route();
+}

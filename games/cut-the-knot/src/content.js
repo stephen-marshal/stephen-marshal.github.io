@@ -9,6 +9,15 @@ export const META = {
     "Inspired by ideas from The Courage to Be Disliked by Ichiro Kishimi and Fumitake Koga, and from Alfred Adler's individual psychology. All words here are my own. This game is not affiliated with the authors or publisher.",
   disclaimer:
     "This is a thinking game, not therapy or a personality test. Feelings are real, and this is just one lens to look through. If things feel heavy, talk to someone you trust or a professional.",
+  signInTitle: "Sign in to play",
+  signInBody:
+    "Sign in with Google to start. Your progress follows you between devices, and your answers help me see which ideas land and which ones trip people up.",
+  privacy:
+    "When you sign in, I record your name, email address, your answers and scores, and when you played. I use this only to see how people play and to improve the game. It is never shared or sold, and only I can see it. Records are kept for up to 12 months. To have your details deleted, email stephen.marshall.sheerness@gmail.com. Sign-in is handled by Google Firebase.",
+  authUnavailable:
+    "Sign-in couldn't load. You might be offline, or a browser extension might be blocking Google sign-in. Try again, or allow it for this page.",
+  readBook:
+    "If any of this landed, read The Courage to Be Disliked itself. Six minutes of play only scratches the surface of the conversation in the book.",
   knotIntro:
     "You arrive with five tangled threads. Each night straightens one. Untangle all five and the knot can be cut.",
 };

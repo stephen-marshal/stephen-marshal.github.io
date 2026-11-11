@@ -7,7 +7,7 @@
 <title>CV Visitors</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,400&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
 <script src="theme.js?v=4"></script>
-<link rel="stylesheet" href="style.css?v=8">
+<link rel="stylesheet" href="style.css?v=9">
 </head>
 <body>
 <div class="wrap">
@@ -41,6 +41,11 @@
       <p>Choose your local <code>cv-content.html</code> to replace the CV that signed-in visitors see.</p>
       <input type="file" id="file" accept=".html,text/html">
       <span id="published" class="session"></span>
+    </section>
+    <section id="ctk-stats">
+      <h2>Cut the Knot: players and stats</h2>
+      <p id="ctk-summary" class="session">Loading…</p>
+      <div id="ctk-body"></div>
     </section>
     <section id="answer-key">
       <h2>Cut the Knot: answer key</h2>
@@ -88,8 +93,46 @@
     $("count").textContent = `Visitors (${snap.size})`;
     $("status").hidden = true;
     $("owner").hidden = false;
-    renderAnswerKey(await import("./games/cut-the-knot/src/content.js"));
+    const content = await import("./games/cut-the-knot/src/content.js");
+    renderAnswerKey(content);
+    try {
+      const engine = await import("./games/cut-the-knot/src/engine.js");
+      const players = (await getDocs(query(collection(db, "ctk_players"), orderBy("lastSeen", "desc")))).docs.map((d) => d.data());
+      renderGameStats(players, engine, content);
+    } catch (err) {
+      $("ctk-summary").textContent = "Couldn't load game stats: " + err.message;
+    }
   });
+
+  // Owner-only player stats for Cut the Knot (REQ-STATS-2), computed by the game's pure engine.
+  function renderGameStats(players, { aggregateStats, NIGHT_IDS }, { NIGHTS, ARCHETYPES }) {
+    const st = aggregateStats(players, NIGHTS);
+    const cell = (tr, text, cls) => { const td = document.createElement("td"); td.textContent = text ?? ""; if (cls) td.className = cls; tr.append(td); };
+    const table = (heads, rows) => {
+      const t = document.createElement("table");
+      const th = t.createTHead().insertRow();
+      for (const h of heads) { const c = document.createElement("th"); c.textContent = h; th.append(c); }
+      const tb = t.createTBody();
+      for (const r of rows) { const tr = tb.insertRow(); for (const v of r) cell(tr, v); }
+      const wrap = document.createElement("div"); wrap.className = "table-wrap"; wrap.append(t);
+      return wrap;
+    };
+    const arche = Object.entries(st.archetypes).map(([k, n]) => `${ARCHETYPES[k]?.name ?? k} ${n}`).join(" · ");
+    $("ctk-summary").textContent = `Players: ${st.players} · Finished all five: ${st.finished} · Average courage: ${st.avgCourage ?? "–"}${arche ? " · " + arche : ""}`;
+    if (!players.length) { $("ctk-body").replaceChildren(); return; }
+    const h3 = (t) => { const e = document.createElement("h3"); e.textContent = t; return e; };
+    const titles = Object.fromEntries(NIGHTS.map((n) => [n.id, `N${n.num}`]));
+    $("ctk-body").replaceChildren(
+      h3("Players"),
+      table(["Name", "Email", "Best scores (N1–N5)", "Courage", "Lifestyle", "Plays", "Last played"],
+        players.map((p) => [p.name, p.email,
+          NIGHT_IDS.map((id) => (Number.isFinite(p.best?.[id]) ? p.best[id] : "–")).join(" · "),
+          p.courage ?? "–", ARCHETYPES[p.archetype]?.name ?? "–", p.plays ?? 0, fmt(p.lastSeen)])),
+      h3("Questions, hardest first"),
+      table(["Night", "Question", "Answered", "% correct", "Most common wrong answer"],
+        st.questions.map((q) => [titles[q.nightId], q.prompt, q.answered, q.pct === null ? "–" : `${q.pct}%`, q.topWrong ?? "–"])),
+    );
+  }
 
   // Owner-only answer key for Cut the Knot (REQ-OWNER-1), built from the game's own content.
   function renderAnswerKey({ NIGHTS }) {
