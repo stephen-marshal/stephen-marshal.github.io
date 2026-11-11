@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Building Cut the Knot spec-first — Stephen Marshall</title>
+<meta name="description" content="How I built a small browser game from a psychology book using spec-driven development and harness engineering: requirement IDs traced to tests, architecture rules enforced in CI, and a headless Chrome play-through with zero dependencies.">
+<meta property="og:title" content="I built a mind game spec-first, and the harness did the arguing">
+<meta property="og:type" content="article">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,400&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<script src="../../theme.js?v=4"></script>
+<link rel="stylesheet" href="../../style.css?v=8">
+<link rel="stylesheet" href="../blog.css?v=4">
+</head>
+<body>
+<div class="wrap">
+<nav class="topnav"><a href="../../">Stephen Marshall</a><a href="../">← All posts</a></nav>
+
+<article>
+<div class="meta">11 November 2026 · Engineering practice · 8 min read</div>
+<h1>I built a mind game spec-first, and the harness did the arguing</h1>
+<p class="lede">A six-minute browser game, 37 numbered requirements, and a test suite that refuses to merge anything the spec doesn't mention. Here's how it fits together, and what it caught.</p>
+
+<p>I recently read <em>The Courage to Be Disliked</em> by Ichiro Kishimi and Fumitake Koga. It's a dialogue about Alfred Adler's psychology: the idea that we act towards goals rather than being pushed by our past, that most friction comes from mixing up our tasks with other people's, and that life is lived in moments rather than on the way to a summit. I wanted to turn those ideas into something you <em>do</em> rather than read, and I wanted it on my CV site.</p>
+
+<p>The result is <a href="../../games/cut-the-knot/"><strong>Cut the Knot</strong></a>, a five-night game. The game itself is small. What I want to write about is how it was built. I treated a hobby project the way I'd like platform work to be treated: the spec comes first, every requirement is traced to a test, and the rules about structure are enforced by machines rather than by memory.</p>
+
+<h2>The game in brief</h2>
+
+<p>Each night turns one idea from the book into a mechanic. All the words are my own; the book is credited as inspiration.</p>
+
+<ul>
+  <li><strong>Cause or Goal:</strong> pick the hidden goal behind an excuse. The card flips from "because…" to "so that…".</li>
+  <li><strong>Fuel or Excuse:</strong> sort lines into healthy striving, an excuse, or a mask.</li>
+  <li><strong>Whose Task?:</strong> swipe Mine or Theirs. It ends with a round you can only win by giving up on keeping ten people happy.</li>
+  <li><strong>Level the Line:</strong> praise and blame tilt a line between you and someone else. Only thanks levels it.</li>
+  <li><strong>Dance the Dots:</strong> catch the "now" dot while thoughts about the past and future drift by. There's deliberately no timer.</li>
+</ul>
+
+<p>It's plain JavaScript: no framework, no build step, no <code>package.json</code>. GitHub Pages serves it as static files, and pushing to <code>main</code> deploys it.</p>
+
+<h2>Spec first, literally</h2>
+
+<p>The first commit contains no code. It's a <code>SPEC.md</code> with requirements like this:</p>
+
+<pre><code>- **REQ-N5-1** Night 5 shows one "now" dot at a time for a short life.
+  It can be tapped or caught with Space / Enter. Thought bubbles labelled
+  past or future drift in, and tapping one costs points. No countdown
+  timer or progress bar is shown during play. That is the point.</code></pre>
+
+<p>The second commit adds tests that cite those IDs in their names, and all of them fail, because nothing exists yet. Only the third commit adds the game. The git history reads spec → red → green, so anyone reviewing it can see that the behaviour was decided before the implementation.</p>
+
+<p>That last sentence of REQ-N5-1 matters more than it looks. An eager contributor, human or AI, will "helpfully" add a progress bar to a timed game. Writing down <em>why</em> it's absent, and having the end-to-end test fail if a timer appears, turns a design decision into something the build defends.</p>
+
+<h2>The harness</h2>
+
+<p>By harness I mean everything around the code that lets someone change it safely without holding the whole project in their head: the map, the constraints, and the feedback loops. Here it has four parts.</p>
+
+<figure>
+<div class="diagram">
+<svg viewBox="0 0 760 250" role="img" aria-labelledby="t1 d1">
+  <title id="t1">The spec-driven loop and the checks that enforce it</title>
+  <desc id="d1">SPEC.md feeds tests, which cite requirement IDs, which drive the code. A traceability check links the spec and the tests in both directions. Architecture, content and end-to-end checks guard the code, and CI runs all of them on every change before GitHub Pages deploys.</desc>
+  <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker></defs>
+  <rect class="box-accent" x="16" y="40" width="150" height="64" rx="10"/>
+  <text x="91" y="68" font-size="14" font-weight="600" text-anchor="middle">SPEC.md</text>
+  <text x="91" y="88" font-size="12" class="muted" text-anchor="middle">37 × REQ-…</text>
+  <path class="arrow" d="M166 72 H 226" marker-end="url(#ah)"/>
+  <rect class="box" x="232" y="40" width="150" height="64" rx="10"/>
+  <text x="307" y="68" font-size="14" font-weight="600" text-anchor="middle">Tests</text>
+  <text x="307" y="88" font-size="12" class="muted" text-anchor="middle">cite REQ IDs</text>
+  <path class="arrow" d="M382 72 H 442" marker-end="url(#ah)"/>
+  <rect class="box" x="448" y="40" width="150" height="64" rx="10"/>
+  <text x="523" y="68" font-size="14" font-weight="600" text-anchor="middle">Code</text>
+  <text x="523" y="88" font-size="12" class="muted" text-anchor="middle">engine · content · ui</text>
+  <path class="arrow" d="M598 72 H 650" marker-end="url(#ah)"/>
+  <rect class="box-accent" x="656" y="40" width="90" height="64" rx="10"/>
+  <text x="701" y="68" font-size="14" font-weight="600" text-anchor="middle">CI</text>
+  <text x="701" y="88" font-size="12" class="muted" text-anchor="middle">→ Pages</text>
+  <path class="arrow" d="M307 104 C 307 150, 91 150, 91 108" marker-end="url(#ah)"/>
+  <text x="199" y="164" font-size="12" text-anchor="middle" class="mono">traceability: both ways</text>
+  <rect class="box" x="400" y="150" width="346" height="84" rx="10"/>
+  <text x="414" y="174" font-size="13" font-weight="600">Guards on the code</text>
+  <text x="414" y="196" font-size="12" class="muted">architecture: engine is pure, content is data</text>
+  <text x="414" y="214" font-size="12" class="muted">content: safety deny-list, originality, phone lengths</text>
+  <text x="414" y="232" font-size="12" class="muted">e2e: headless Chrome plays all five nights</text>
+  <path class="arrow" d="M523 104 V 144" marker-end="url(#ah)"/>
+</svg>
+</div>
+<figcaption>The loop: the spec decides, the tests enforce, CI blocks the deploy.</figcaption>
+</figure>
+
+<h3>1. A map: AGENTS.md</h3>
+
+<p>A one-page file in the game folder says where everything is, which commands to run, which rules are enforced, and the gotchas (for example: bump the <code>?v=</code> cache-buster when you change an asset, and don't "fix" the missing timer). It's written for a new contributor, and that includes an AI coding agent, which reads it before touching anything. If the map is wrong, fixing it is part of the change.</p>
+
+<h3>2. Traceability that fails the build</h3>
+
+<p>This is the core of the harness and it's tiny. One test reads every <code>REQ-…</code> ID from the spec and every ID cited in the tests, and fails if they don't match in either direction:</p>
+
+<pre><code>test("REQ-HARNESS-3 every requirement in SPEC.md is cited by a test", () =&gt; {
+  const missing = [...specIds].filter((id) =&gt; !cited.has(id));
+  assert.deepEqual(missing, [], `untested requirements: ${missing.join(", ")}`);
+});
+
+test("REQ-HARNESS-3 tests only cite requirements that exist in SPEC.md", () =&gt; {
+  const unknown = [...cited].filter((id) =&gt; !specIds.has(id));
+  assert.deepEqual(unknown, [], `unknown requirement ids: ${unknown.join(", ")}`);
+});</code></pre>
+
+<p>Add a requirement and forget to test it: red. Delete a requirement but leave its test: red. The spec can't quietly drift from reality, which is the usual fate of a design doc.</p>
+
+<h3>3. Architecture rules as tests</h3>
+
+<p>The game has three layers: <code>engine.js</code> (pure logic: scoring, a seeded RNG, routing, saving progress through an injected storage adapter), <code>content.js</code> (only data), and <code>ui.js</code> (the only file allowed to touch the DOM). Rules like that usually live in a reviewer's head. Here they're a test:</p>
+
+<pre><code>test("REQ-ARCH-1 engine.js is pure: no DOM, window, storage globals or timers", () =&gt; {
+  const src = code(read("src/engine.js"));
+  for (const banned of ["document", "window", "localStorage", "setTimeout",
+    "requestAnimationFrame", "Math.random"]) {
+    assert.ok(!src.includes(banned), `engine.js must not use ${banned}`);
+  }
+});</code></pre>
+
+<p>Banning <code>Math.random</code> in the engine means every shuffle goes through a seeded generator, so a game can be replayed exactly from its seed. The same file also enforces a 150 KB budget (the game is about 75 KB), no third-party scripts, and zero npm dependencies. The content tests check a safety deny-list, phone-friendly text lengths, and an originality guard: no quotation longer than twelve words, and none of the book's character labels.</p>
+
+<h3>4. An end-to-end test with no dependencies</h3>
+
+<p>I didn't want Playwright or Puppeteer in a repo that has no <code>package.json</code>. Modern Node ships <code>fetch</code> and a global <code>WebSocket</code>, and that's all you need to talk to Chrome's DevTools Protocol directly:</p>
+
+<pre><code>const target = await (await fetch(`http://127.0.0.1:${port}/json/new?about:blank`,
+  { method: "PUT" })).json();
+const ws = new WebSocket(target.webSocketDebuggerUrl);
+// ...then Runtime.evaluate to click through the game, and
+// Runtime.exceptionThrown / Log.entryAdded to fail on any page error.</code></pre>
+
+<p>About 250 lines play all five nights to the finale with a <code>?test=1</code> flag that speeds up the timers. Along the way they check that the Night 1 card flips, that the approval round settles into the right split, that Night 5 shows no timer, that progress survives in <code>localStorage</code>, that deep links and the back button work, and that sharing falls back gracefully when the browser has no share API. GitHub's Ubuntu runners already have Chrome, so CI needs nothing extra. With <code>--shots</code> it also saves screenshots in light and dark mode at phone and desktop sizes, so a reviewer (or an agent) can actually <em>see</em> the change.</p>
+
+<h2>Built with an AI coding agent</h2>
+
+<p>I built this with an AI coding agent doing most of the typing, and that's exactly why the harness matters. An agent is fast and confident, which is great until it's confidently wrong. The spec gave it something concrete to build towards. The traceability test stopped it from inventing behaviour the spec didn't ask for. The architecture tests kept its "quick fixes" out of the wrong layer. And the end-to-end run and screenshots meant I reviewed evidence rather than claims. The work moved from "check every line" to "decide the rules, then check the results", which is how I'd like platform teams to work with agents too.</p>
+
+<h2>What the harness caught</h2>
+
+<ul>
+  <li><strong>A tooling gotcha on day one.</strong> On Node 23, <code>node --test some/dir/</code> tried to run the directory as a single file. The spec, map and CI now all use the glob form <code>"tests/*.test.mjs"</code>, and a test checks the CI workflow uses it.</li>
+  <li><strong>A design bug found by playing.</strong> In the approval round, every face drained to zero within about two seconds. That felt hopeless rather than draining. The fix started in the spec ("drains steadily; each click restores +35"), then the test (a 4-clicks-a-second player must still lose ground, but slowly), and only then the engine.</li>
+  <li><strong>A flaky teardown in CI.</strong> All nineteen end-to-end checks passed, then the job failed while deleting Chrome's profile folder, because Chrome was still writing to it. It now waits for Chrome to exit and retries the delete, and cleanup can't fail the run.</li>
+</ul>
+
+<h2>The numbers</h2>
+
+<ul>
+  <li>37 requirements, 43 fast tests (under a second), 19 end-to-end checks (about 5 seconds in CI)</li>
+  <li>About 75 KB of game files and zero runtime or dev dependencies</li>
+  <li>One small later feature, an owner-only answer key on my private admin page, went through the same loop: new requirement, failing test, code, CI</li>
+</ul>
+
+<h2>What's next</h2>
+
+<p>The obvious version 2 is "what did other players answer?", with anonymous counts kept by a small Cloudflare Worker while the game stays on GitHub Pages. That will start, as always, with a new <code>REQ-…</code> line.</p>
+
+<p>In the meantime, <a href="../../games/cut-the-knot/">go and cut the knot</a>. It takes about six minutes, and nothing you do leaves your browser.</p>
+
+<div class="sources">
+  <strong>Sources</strong>
+  <ul>
+    <li>Ichiro Kishimi and Fumitake Koga, <em>The Courage to Be Disliked</em> (the inspiration; the game is not affiliated with the authors or publisher)</li>
+    <li><a href="https://nodejs.org/api/test.html">Node.js test runner documentation</a></li>
+    <li><a href="https://chromedevtools.github.io/devtools-protocol/">Chrome DevTools Protocol</a></li>
+    <li><a href="https://github.com/stephen-marshal/stephen-marshal.github.io/tree/main/games/cut-the-knot">The game's spec, tests and code on GitHub</a></li>
+  </ul>
+  <p>Views are my own, written for my personal blog.</p>
+</div>
+</article>
+</div>
+</body>
+</html>
