@@ -76,18 +76,19 @@ test("REQ-N4-1 judging replies tilt the line, encouragement levels it", () => {
   assert.equal(z, 0);
 });
 
-test("REQ-N3-2 faces drain over time, never below 0, and refill to 100", () => {
+test("REQ-N3-2 faces drain over time, never below 0, and a click restores only part", () => {
   const rates = E.faceRates(E.createRng(3));
   assert.equal(rates.length, 10);
   let levels = Array(10).fill(100);
   levels = E.facesStep(levels, 1000, rates);
-  assert.ok(levels.every((l) => l < 100));
+  assert.ok(levels.every((l) => l < 100 && l > 50), "drain is gradual, not instant");
   levels = E.facesStep(levels, 60000, rates);
   assert.ok(levels.every((l) => l === 0));
-  assert.equal(E.refill(levels, 4)[4], 100);
-  // one person cannot keep up: total drain per second exceeds what ~3 refills/s can restore
+  assert.equal(E.refill(levels, 4)[4], E.REFILL);
+  assert.equal(E.refill(Array(10).fill(90), 0)[0], 100);
+  // a fast clicker (4 clicks/s) restores less than everyone loses each second
   const drainPerSec = rates.reduce((a, r) => a + r, 0);
-  assert.ok(drainPerSec > 300);
+  assert.ok(drainPerSec > 4 * E.REFILL, `drain ${drainPerSec}/s`);
 });
 
 test("REQ-N3-2 settled faces follow the 1-2-7 split", () => {
