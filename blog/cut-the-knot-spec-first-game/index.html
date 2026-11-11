@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,400&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
 <script src="../../theme.js?v=4"></script>
-<link rel="stylesheet" href="../../style.css?v=8">
+<link rel="stylesheet" href="../../style.css?v=9">
 <link rel="stylesheet" href="../blog.css?v=4">
 </head>
 <body>
@@ -138,10 +138,6 @@ const ws = new WebSocket(target.webSocketDebuggerUrl);
 
 <p>About 250 lines play all five nights to the finale with a <code>?test=1</code> flag that speeds up the timers. Along the way they check that the Night 1 card flips, that the approval round settles into the right split, that Night 5 shows no timer, that progress survives in <code>localStorage</code>, that deep links and the back button work, and that sharing falls back gracefully when the browser has no share API. GitHub's Ubuntu runners already have Chrome, so CI needs nothing extra. With <code>--shots</code> it also saves screenshots in light and dark mode at phone and desktop sizes, so a reviewer (or an agent) can actually <em>see</em> the change.</p>
 
-<h2>Built with an AI coding agent</h2>
-
-<p>I built this with an AI coding agent doing most of the typing, and that's exactly why the harness matters. An agent is fast and confident, which is great until it's confidently wrong. The spec gave it something concrete to build towards. The traceability test stopped it from inventing behaviour the spec didn't ask for. The architecture tests kept its "quick fixes" out of the wrong layer. And the end-to-end run and screenshots meant I reviewed evidence rather than claims. The work moved from "check every line" to "decide the rules, then check the results", which is how I'd like platform teams to work with agents too.</p>
-
 <h2>What the harness caught</h2>
 
 <ul>
@@ -154,15 +150,13 @@ const ws = new WebSocket(target.webSocketDebuggerUrl);
 
 <ul>
   <li>37 requirements, 43 fast tests (under a second), 19 end-to-end checks (about 5 seconds in CI)</li>
-  <li>About 75 KB of game files and zero runtime or dev dependencies</li>
+  <li>About 75 KB of game files, no build step and no npm packages</li>
   <li>One small later feature, an owner-only answer key on my private admin page, went through the same loop: new requirement, failing test, code, CI</li>
 </ul>
 
-<h2>What's next</h2>
+<p>Want to try it? <a href="../../games/cut-the-knot/">Go and cut the knot</a>. It takes about six minutes, and you sign in with Google so your progress follows you between devices.</p>
 
-<p>The obvious version 2 is "what did other players answer?", with anonymous counts kept by a small Cloudflare Worker while the game stays on GitHub Pages. That will start, as always, with a new <code>REQ-…</code> line.</p>
-
-<p>In the meantime, <a href="../../games/cut-the-knot/">go and cut the knot</a>. It takes about six minutes, and nothing you do leaves your browser.</p>
+<p class="callout">And if any of these ideas land, please read <em>The Courage to Be Disliked</em> itself. The game only scratches the surface of a conversation that's well worth the full book.</p>
 
 <div class="sources">
   <strong>Sources</strong>
