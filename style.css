@@ -136,7 +136,7 @@ body.signed-in .hero { grid-template-columns: auto 1fr; gap: 22px; padding-botto
 body.signed-in .portrait { display: none; }
 body.signed-in .avatar { display: block; }
 body.signed-in .hero h1 { font-size: clamp(2rem, 5vw, 2.8rem); }
-body.signed-in .name-underline, body.signed-in .quote, body.signed-in .latest { display: none; }
+body.signed-in .name-underline, body.signed-in .quote, body.signed-in .latest:not(.projects) { display: none; }
 body.signed-in .role { margin-bottom: 14px; }
 .avatar {
   display: none; width: 112px; height: 112px; border-radius: 50%; overflow: hidden; flex: none;
