@@ -94,3 +94,13 @@ test("REQ-HARNESS-2 CI runs the fast checks and the e2e play-through", () => {
   assert.match(y, /node games\/cut-the-knot\/tools\/e2e\.mjs/);
   assert.match(y, /pull_request/);
 });
+
+test("REQ-OWNER-1 answer key lives only in the owner block of visitors.html, after the owner check", () => {
+  const v = readFileSync(join(REPO, "visitors.html"), "utf8");
+  const owner = v.slice(v.indexOf('<div id="owner" hidden>'), v.indexOf("</div>\n</div>"));
+  assert.match(owner, /id="answer-key"/, "answer-key section must sit inside #owner");
+  const check = v.indexOf("user.email !== OWNER_EMAIL");
+  const load = v.indexOf('import("./games/cut-the-knot/src/content.js")');
+  assert.ok(check > 0 && load > check, "content must be loaded only after the owner check");
+  assert.doesNotMatch(read("index.html"), /answer-key/, "the public game page must not show the key");
+});
