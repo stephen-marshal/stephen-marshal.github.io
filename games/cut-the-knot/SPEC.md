@@ -1,6 +1,6 @@
 # Cut the Knot — Specification
 
-Status: **v1.0** · Owner: Stephen Marshall · Source of truth for behaviour.
+Status: **v2.0** (v1.0 shipped 2026-11-11; v2 adds sign-in and player stats) · Owner: Stephen Marshall · Source of truth for behaviour.
 
 > This file is written **before** code. Every requirement has an ID (`REQ-…`).
 > Every ID must be covered by at least one automated test that names it.
@@ -22,7 +22,7 @@ knot is cut.
 ## 2. Non-goals
 
 - Not therapy, diagnosis or a personality test. The game says so (REQ-SAFE-1).
-- No accounts, backend, analytics or cookies. Nothing leaves the browser.
+- No third-party analytics or tracking. The only data collected is what section 4.5c describes, and players are told so before they sign in.
 - No reproduction of the book's text or characters. Ideas only, in my own words.
 
 ## 3. Structure
@@ -67,7 +67,7 @@ knot is cut.
 
 ### 4.4 Persistence and sharing
 
-- **REQ-SAVE-1** Progress (best score per night) is saved to `localStorage`. If storage is missing, blocked or throws, the game still works, just without saving.
+- **REQ-SAVE-1** Progress (best score per night) is saved to `localStorage` under a key per signed-in user, so two people sharing a browser don't share progress. If storage is missing, blocked or throws, the game still works, just without saving locally.
 - **REQ-SHARE-1** The share text contains the archetype, the courage score and the game URL, and no personal data. It uses the Web Share API if available, otherwise the clipboard, otherwise it shows the text.
 
 ### 4.5 Content
@@ -84,14 +84,24 @@ knot is cut.
 
 - **REQ-OWNER-1** An answer key for nights 1–4, plus tips for Ten Faces and Night 5, is shown on the owner-only `/visitors.html` page. It appears only after the owner's Google account is confirmed. It is generated from `src/content.js` at runtime, so it can never drift from the game. Note: this is for convenience, not secrecy. The content ships to every player's browser, so the key is not truly secret.
 
+### 4.5c Sign-in and player stats (v2)
+
+- **REQ-AUTH-1** Playing requires signing in with Google (Firebase Authentication, the same project as the CV site). Signed out, every route shows the sign-in gate, and the hash is kept so the player lands where they meant to after signing in. Signed in, the nav shows who is signed in and offers Sign out.
+- **REQ-AUTH-2** The gate states, before sign-in, what is recorded (name, email, answers, scores and play times), why, that it is never shared or sold, that it is kept for up to 12 months, and how to ask for deletion.
+- **REQ-AUTH-3** If the sign-in service cannot load (offline, or blocked by an extension), the game says so plainly instead of breaking.
+- **REQ-STATS-1** When a night is finished, the player's best score for that night and their latest answer to each item are merged into Firestore `ctk_players/{uid}`. After all five nights, courage and archetype are saved too. A failed save never blocks play. On sign-in, saved best scores are merged into local progress, so progress follows the player across devices.
+- **REQ-STATS-2** The owner-only `/visitors.html` page shows Cut the Knot stats, loaded only after the owner check: players, how many finished, average courage, archetype counts, a table of players, and every question's % correct with the most common wrong answer, hardest first. The numbers come from the pure `engine.aggregateStats`.
+- **REQ-STATS-3** A player document holds only these fields: name, email, firstSeen, lastSeen, plays, best, answers, courage, archetype. The Firestore rules (kept in the private `cv-private/firestore.rules`) allow the same list: players can read and write only their own document, and only the owner can read everyone's.
+- **REQ-BOOK-1** The game encourages players to read the book itself, on the sign-in gate and on the finale.
+
 ### 4.6 Quality
 
 - **REQ-A11Y-1** Every action works with a keyboard. Feedback is announced through an `aria-live` region. The page has `lang`, a `<title>` and a meta description.
 - **REQ-A11Y-2** `prefers-reduced-motion` turns off drifting and flip animations. Night 5 gives longer dot lifetimes, so it stays playable.
 - **REQ-A11Y-3** Light and dark themes use the site's shared tokens and theme switch.
-- **REQ-PERF-1** No third-party scripts. Game files total at most 150 KB, not counting shared site files.
+- **REQ-PERF-1** No third-party scripts, except the Firebase SDK (pinned version, from `www.gstatic.com`) loaded by `src/auth.js` for sign-in and stats. Game files total at most 150 KB, not counting shared site files.
 - **REQ-ARCH-1** `src/engine.js` is pure: no DOM, no `window`, no storage, no timers. Only `src/ui.js` touches the DOM.
-- **REQ-E2E-1** A headless browser test plays all five nights to the finale with the `?test=1` speed-up, and fails if the page logs an error.
+- **REQ-E2E-1** A headless browser test plays all five nights to the finale with the `?test=1` speed-up, and fails if the page logs an error. It replaces `src/auth.js` with a fake through DevTools request interception, so production code has no sign-in bypass. `?test=1` only changes timer speed.
 
 ### 4.7 Harness
 

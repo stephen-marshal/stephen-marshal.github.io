@@ -64,14 +64,41 @@ test("REQ-A11Y-3 uses the shared site theme and tokens", () => {
   assert.match(css, /\[data-theme="dark"\]/);
 });
 
-test("REQ-PERF-1 no third-party scripts and the game stays under 150 KB", () => {
+test("REQ-PERF-1 no third-party scripts except the pinned Firebase SDK in auth.js; under 150 KB", () => {
   const html = read("index.html");
   for (const m of html.matchAll(/<script[^>]*src="([^"]+)"/g)) {
     assert.doesNotMatch(m[1], /^https?:\/\//, `third-party script ${m[1]}`);
   }
+  for (const f of readdirSync(join(GAME, "src"))) {
+    const src = read(`src/${f}`);
+    for (const m of src.matchAll(/(?:from|import\()\s*"(https?:[^"]+)"/g)) {
+      assert.equal(f, "auth.js", `${f} imports ${m[1]}`);
+      assert.match(m[1], /^https:\/\/www\.gstatic\.com\/firebasejs\/11\.0\.2\//, m[1]);
+    }
+  }
   const files = ["index.html", "game.css", ...readdirSync(join(GAME, "src")).map((f) => `src/${f}`)];
   const total = files.reduce((sum, f) => sum + statSync(join(GAME, f)).size, 0);
   assert.ok(total <= 150 * 1024, `game is ${total} bytes`);
+});
+
+test("REQ-AUTH-1 REQ-AUTH-3 ui.js loads auth lazily, survives it failing, and has no test bypass", () => {
+  const ui = read("src/ui.js");
+  assert.match(ui, /import\("\.\/auth\.js"\)/, "auth.js must be a dynamic import so a blocked SDK can't break the page");
+  assert.match(ui, /catch/);
+  assert.doesNotMatch(ui, /params\.has\("test"\)[^\n]*(user|auth|sign)/i, "?test=1 must not touch sign-in");
+  assert.doesNotMatch(ui, /__ctk|fakeUser/);
+  const auth = read("src/auth.js");
+  assert.ok(!code(auth).includes("document."), "auth.js must not touch the DOM");
+  assert.match(auth, /firebase-config\.js/);
+});
+
+test("REQ-STATS-2 stats render on visitors.html only after the owner check", () => {
+  const v = readFileSync(join(REPO, "visitors.html"), "utf8");
+  assert.match(v.slice(v.indexOf('<div id="owner" hidden>')), /id="ctk-stats"/);
+  const check = v.indexOf("user.email !== OWNER_EMAIL");
+  const load = v.indexOf('collection(db, "ctk_players")');
+  assert.ok(check > 0 && load > check, "player data must be read only after the owner check");
+  assert.match(v, /aggregateStats/);
 });
 
 test("REQ-HARNESS-1 tests need nothing but Node built-ins", () => {
