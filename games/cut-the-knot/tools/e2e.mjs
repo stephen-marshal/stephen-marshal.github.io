@@ -74,7 +74,14 @@ async function launch() {
   await send("Runtime.enable");
   await send("Log.enable");
   await send("Page.enable");
-  const close = () => { try { ws.close(); } catch {} proc.kill("SIGKILL"); rmSync(profile, { recursive: true, force: true }); };
+  // Wait for Chrome to exit before deleting its profile; cleanup must never fail the run.
+  const close = async () => {
+    try { ws.close(); } catch {}
+    const exited = new Promise((r) => proc.once("exit", r));
+    proc.kill("SIGKILL");
+    await Promise.race([exited, sleep(5000)]);
+    try { rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); } catch { /* temp dir; OS will clean it */ }
+  };
   return { send, errors, close };
 }
 
@@ -234,7 +241,7 @@ async function main() {
     ok("REQ-E2E-1 full play-through with no page errors");
     console.log(`\nE2E passed: ${steps.length} checks.`);
   } finally {
-    chrome.close();
+    await chrome.close();
     server.close();
   }
 }
