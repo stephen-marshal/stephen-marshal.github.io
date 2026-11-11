@@ -323,3 +323,10 @@ body.signed-in .term-wrap { margin-top: 24px; }
   .term-input input { font-size: 16px; }
   .term-title { display: none; }
 }
+
+/* owner-only Cut the Knot answer key (visitors.html) */
+#answer-key details { border: 1px solid var(--line); border-radius: 10px; padding: 8px 14px; margin: 0 0 8px; background: var(--surface); }
+#answer-key summary { cursor: pointer; font-weight: 600; }
+#answer-key ul { margin: 8px 0 4px; padding-left: 18px; font-size: 0.92rem; }
+#answer-key li { margin: 0 0 6px; }
+#answer-key li span { color: var(--muted); }

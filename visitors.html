@@ -7,7 +7,7 @@
 <title>CV Visitors</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,400&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
 <script src="theme.js?v=4"></script>
-<link rel="stylesheet" href="style.css?v=4">
+<link rel="stylesheet" href="style.css?v=8">
 </head>
 <body>
 <div class="wrap">
@@ -41,6 +41,11 @@
       <p>Choose your local <code>cv-content.html</code> to replace the CV that signed-in visitors see.</p>
       <input type="file" id="file" accept=".html,text/html">
       <span id="published" class="session"></span>
+    </section>
+    <section id="answer-key">
+      <h2>Cut the Knot: answer key</h2>
+      <p class="session">Only shown to you, and generated from the game's content. It isn't truly secret, because the game's files ship to every player's browser.</p>
+      <div id="key-body"></div>
     </section>
   </div>
 </div>
@@ -83,7 +88,31 @@
     $("count").textContent = `Visitors (${snap.size})`;
     $("status").hidden = true;
     $("owner").hidden = false;
+    renderAnswerKey(await import("./games/cut-the-knot/src/content.js"));
   });
+
+  // Owner-only answer key for Cut the Knot (REQ-OWNER-1), built from the game's own content.
+  function renderAnswerKey({ NIGHTS }) {
+    const el = (tag, text, cls) => { const e = document.createElement(tag); if (text) e.textContent = text; if (cls) e.className = cls; return e; };
+    const [n1, n2, n3, n4, n5] = NIGHTS;
+    const bins = Object.fromEntries(n2.bins.map((b) => [b.id, b.label]));
+    const night = (n, rows) => {
+      const d = el("details");
+      d.append(el("summary", `Night ${n.num}: ${n.title}`));
+      const ul = el("ul");
+      for (const [q, a] of rows) { const li = el("li"); li.append(el("span", `${q} → `), el("b", a)); ul.append(li); }
+      d.append(ul);
+      return d;
+    };
+    $("key-body").replaceChildren(
+      night(n1, n1.items.map((i) => [i.excuse, i.options[i.correct]])),
+      night(n2, n2.items.map((i) => [i.text, bins[i.bin]])),
+      night(n3, [...n3.items.map((i) => [i.text, i.owner === "mine" ? "Mine" : "Theirs"]),
+        ["Ten Faces", `Click “${n3.faces.stopLabel}” when it appears (100% of that round)`]]),
+      night(n4, n4.items.map((i) => [i.scene, i.options.find((o) => o.kind === "encourage").text])),
+      night(n5, [["Dots", "Catch every dot (tap or Space)"], ["Thoughts", "Don't tap the drifting past/future thoughts: each one costs 8 points"]]),
+    );
+  }
 
   $("file").onchange = async (e) => {
     const f = e.target.files[0];

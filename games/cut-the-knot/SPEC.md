@@ -80,6 +80,10 @@ knot is cut.
 - **REQ-ORIG-1** Originality: no quoted passage longer than 12 words, and no use of the book's character labels. The page credits the book and authors as inspiration and states it is not affiliated.
 - **REQ-SAFE-1** The game states it is a thinking game, not therapy. Content avoids self-harm, abuse and trauma scenarios (checked with a deny-list).
 
+### 4.5b Owner tools
+
+- **REQ-OWNER-1** An answer key for nights 1–4, plus tips for Ten Faces and Night 5, is shown on the owner-only `/visitors.html` page. It appears only after the owner's Google account is confirmed. It is generated from `src/content.js` at runtime, so it can never drift from the game. Note: this is for convenience, not secrecy. The content ships to every player's browser, so the key is not truly secret.
+
 ### 4.6 Quality
 
 - **REQ-A11Y-1** Every action works with a keyboard. Feedback is announced through an `aria-live` region. The page has `lang`, a `<title>` and a meta description.
