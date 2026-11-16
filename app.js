@@ -71,7 +71,7 @@ function buildNav() {
   const nav = $("cvnav");
   nav.innerHTML = "";
   spy?.disconnect();
-  const sections = [...$("cv").querySelectorAll("section")].filter((s) => s.querySelector("h2"));
+  const sections = [...$("cv").querySelectorAll("section")].filter((s) => s.querySelector("h2") && !s.classList.contains("print-only"));
   sections.forEach((s) => {
     const label = s.querySelector("h2").textContent.trim();
     s.id = s.id || label.toLowerCase().replace(/[^a-z0-9]+/g, "-");

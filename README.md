@@ -70,6 +70,8 @@ Kept locally in `~/personal/cv-private/` (not published):
 2. Open https://stephen-marshal.github.io/visitors.html and sign in with the owner Google account.
 3. Under **Publish CV content**, choose the edited `cv-content.html`. It goes live immediately.
 
+Anything inside an element with `class="print-only"` (for example the **Personal details** section with email and phone) appears only in the downloaded PDF, not on the web page. The PDF always uses the dark theme, keeps links clickable, and puts **Projects** at the end.
+
 ### See who has viewed the CV
 Open https://stephen-marshal.github.io/visitors.html and sign in as the owner.
 You can also see the raw records in the Firebase console under **Firestore**, collection `visitors`.
