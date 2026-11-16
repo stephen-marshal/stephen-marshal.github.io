@@ -128,3 +128,18 @@ onAuthStateChanged(auth, async (user) => {
     $("cv").hidden = false;
   }
 });
+
+// In the downloaded PDF, links with data-print-href point somewhere else
+// (e.g. the header "Projects" button opens councilofmodels.uk instead of
+// scrolling to the section). Swap before printing, restore afterwards.
+window.addEventListener("beforeprint", () => {
+  document.querySelectorAll("a[data-print-href]").forEach((a) => {
+    a.dataset.screenHref = a.getAttribute("href");
+    a.setAttribute("href", a.dataset.printHref);
+  });
+});
+window.addEventListener("afterprint", () => {
+  document.querySelectorAll("a[data-print-href]").forEach((a) => {
+    if (a.dataset.screenHref) a.setAttribute("href", a.dataset.screenHref);
+  });
+});
