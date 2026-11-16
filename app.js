@@ -71,7 +71,7 @@ function buildNav() {
   const nav = $("cvnav");
   nav.innerHTML = "";
   spy?.disconnect();
-  const sections = [...$("cv").querySelectorAll("section")].filter((s) => s.querySelector("h2"));
+  const sections = [...$("cv").querySelectorAll("section")].filter((s) => s.querySelector("h2") && !s.classList.contains("print-only"));
   sections.forEach((s) => {
     const label = s.querySelector("h2").textContent.trim();
     s.id = s.id || label.toLowerCase().replace(/[^a-z0-9]+/g, "-");
@@ -127,4 +127,19 @@ onAuthStateChanged(auth, async (user) => {
     $("cv").innerHTML = '<p class="loading">Could not load the CV. Please refresh.</p>';
     $("cv").hidden = false;
   }
+});
+
+// In the downloaded PDF, links with data-print-href point somewhere else
+// (e.g. the header "Projects" button opens councilofmodels.uk instead of
+// scrolling to the section). Swap before printing, restore afterwards.
+window.addEventListener("beforeprint", () => {
+  document.querySelectorAll("a[data-print-href]").forEach((a) => {
+    a.dataset.screenHref = a.getAttribute("href");
+    a.setAttribute("href", a.dataset.printHref);
+  });
+});
+window.addEventListener("afterprint", () => {
+  document.querySelectorAll("a[data-print-href]").forEach((a) => {
+    if (a.dataset.screenHref) a.setAttribute("href", a.dataset.screenHref);
+  });
 });

@@ -247,16 +247,45 @@ th { color: var(--muted); font-weight: 600; font-size: 0.76rem; text-transform: 
 }
 
 /* ---------- print: clean CV ---------- */
+.print-only { display: none; }
+
+/* Download / print PDF: keep the dark theme and make every link clickable.
+   print-color-adjust forces backgrounds to print even when the browser's
+   "Background graphics" option is off. */
+@page { size: A4; margin: 0; }
 @media print {
-  :root { --bg: #fff; --surface: #fff; --text: #000; --muted: #444; --line: #ccc; --accent: #000; --accent-2: #000; --chip: #fff; --chip-text: #000; }
-  body { background: #fff; }
-  .actions, .session, .gate, .cv-nav, .latest, .portrait, .name-underline, .term-wrap { display: none !important; }
-  .wrap { padding: 0; max-width: none; }
-  .chip { border: 1px solid #ccc; }
-  section, .job, .item, .skill-group { break-inside: avoid; }
-  .skill-group, .item, .principles div { box-shadow: none; }
-  a { text-decoration: none; }
-  * { animation: none !important; }
+  :root, :root[data-theme] {
+    --bg: #0f1115; --surface: #171a21; --text: #ece9e2; --muted: #a3a8b3; --line: #2a2f39;
+    --accent: #45c4cc; --accent-2: #ff8a4c; --chip: #133338; --chip-text: #a3e6ea;
+    --shadow: none;
+  }
+  html, body { background: var(--bg) !important; color: var(--text); }
+  *, *::before, *::after { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; animation: none !important; transition: none !important; }
+  body { background-image: none !important; }
+  .actions, .session, .gate, .cv-nav, .latest, .portrait, .name-underline, .term-wrap, .term-chips, .loading { display: none !important; }
+  /* Projects stays in the PDF so the Projects link has somewhere to go */
+  .latest.projects { display: block !important; margin-top: 18px; }
+  html { font-size: 13px; }
+  body { font-size: 1rem; }
+  /* Order in the PDF: header, personal details + CV, then Projects */
+  .wrap { padding: 12mm 14mm; max-width: none; display: flex; flex-direction: column; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+  #cv { order: 1; }
+  .latest.projects { order: 2; }
+  section { padding-top: 22px; }
+  .job { padding-bottom: 18px; }
+  /* Let long sections flow across pages; keep each entry and its heading together */
+  section { break-inside: auto; }
+  h2, h3 { break-after: avoid; }
+  .job, .item, .skill-group, .post-card, .principles div { break-inside: avoid; }
+  .skill-group, .item, .principles div, .post-card { box-shadow: none; }
+  a { color: var(--accent); }
+  .print-only { display: block !important; }
+  .personal-info dl { display: grid; grid-template-columns: 130px 1fr; gap: 6px 16px; margin: 0; }
+  .personal-info dt { color: var(--muted); }
+  .personal-info dd { margin: 0; }
+  /* Contact links: clickable in the PDF, and the address is printed for paper copies */
+  .contact a { border: 1px solid var(--line); }
+  .contact a[data-print]::after { content: " · " attr(data-print); color: var(--muted); font-weight: 400; }
 }
 
 /* ---------- theme switch (theme.js) ---------- */
